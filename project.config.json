@@ -1,0 +1,15 @@
+{
+  "description": "仅展示、可分享的微信小程序点餐页",
+  "miniprogramRoot": "miniprogram/",
+  "compileType": "miniprogram",
+  "appid": "touristappid",
+  "projectname": "baby_menu",
+  "setting": {
+    "urlCheck": true,
+    "es6": true,
+    "postcss": true,
+    "minified": true,
+    "enhance": true
+  },
+  "condition": {}
+}
