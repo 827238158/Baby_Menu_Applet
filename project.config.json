@@ -1,15 +1,30 @@
 {
-  "description": "仅展示、可分享的微信小程序点餐页",
-  "miniprogramRoot": "miniprogram/",
-  "compileType": "miniprogram",
-  "appid": "touristappid",
-  "projectname": "baby_menu",
-  "setting": {
-    "urlCheck": true,
-    "es6": true,
-    "postcss": true,
-    "minified": true,
-    "enhance": true
-  },
-  "condition": {}
+    "description": "漂亮宝宝专属菜单",
+    "miniprogramRoot": "miniprogram/",
+    "compileType": "miniprogram",
+    "appid": "wx2ea5be0722065814",
+    "projectname": "baby_menu",
+    "setting": {
+        "urlCheck": true,
+        "es6": true,
+        "postcss": true,
+        "minified": true,
+        "enhance": true,
+        "babelSetting": {
+            "ignore": [],
+            "disablePlugins": [],
+            "outputPath": ""
+        }
+    },
+    "condition": {},
+    "libVersion": "3.16.1",
+    "srcMiniprogramRoot": "miniprogram/",
+    "packOptions": {
+        "ignore": [],
+        "include": []
+    },
+    "editorSetting": {
+        "tabIndent": "insertSpaces",
+        "tabSize": 4
+    }
 }

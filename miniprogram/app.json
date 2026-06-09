@@ -3,7 +3,7 @@
     "pages/menu/menu"
   ],
   "window": {
-    "navigationBarTitleText": "点餐菜单",
+    "navigationBarTitleText": "宝宝菜单",
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#f6f7f9"

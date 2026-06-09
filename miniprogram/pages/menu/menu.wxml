@@ -1,10 +1,11 @@
-<view class="page">
-  <view class="shop-header">
+<view class="page" style="{{pageStyle}}">
+  <view class="shop-header" style="{{headerStyle}}">
     <view class="shop-copy">
+      <text class="shop-kicker">今日菜单</text>
       <text class="shop-name">{{shop.name}}</text>
       <text class="shop-subtitle">{{shop.subtitle}}</text>
+      <text class="shop-stats">{{dishCount}} 道 · {{categories.length}} 类 · 可分享</text>
     </view>
-    <button class="share-button" open-type="share">分享菜单</button>
   </view>
 
   <view class="content">
@@ -15,59 +16,152 @@
           data-id="{{item.id}}"
           bindtap="switchCategory"
         >
-          {{item.name}}
+          <text class="category-name">{{item.name}}</text>
+          <text class="category-count">{{item.count}} 道</text>
         </view>
       </block>
     </scroll-view>
 
     <scroll-view class="dish-list" scroll-y enhanced show-scrollbar="{{false}}">
-      <block wx:for="{{activeItems}}" wx:key="id">
-        <view class="dish-card">
-          <image class="dish-image" src="{{item.image}}" mode="aspectFill"></image>
-          <view class="dish-info">
-            <view class="dish-title-row">
-              <text class="dish-name">{{item.name}}</text>
-              <text wx:if="{{item.price}}" class="dish-price">¥{{item.price}}</text>
-            </view>
-            <text class="dish-desc">{{item.desc}}</text>
-            <view class="tag-row" wx:if="{{item.tags && item.tags.length}}">
-              <text class="tag" wx:for="{{item.tags}}" wx:for-item="tag" wx:key="*this">{{tag}}</text>
-            </view>
-            <view class="dish-actions">
-              <button class="ghost-button" data-id="{{item.id}}" bindtap="showDetail">详情</button>
-              <button class="add-button" data-id="{{item.id}}" bindtap="addDish">加入</button>
+      <block wx:if="{{activeItems.length > 0}}">
+        <block wx:for="{{activeItems}}" wx:key="id">
+          <view class="dish-card">
+            <view class="dish-card-main">
+              <image
+                class="dish-image"
+                src="{{item.image}}"
+                mode="aspectFill"
+                data-id="{{item.id}}"
+                binderror="handleImageError"
+              ></image>
+              <view class="dish-info">
+                <view class="dish-title-row">
+                  <text class="dish-name">{{item.name}}</text>
+                  <text wx:if="{{item.price}}" class="dish-price">¥{{item.price}}</text>
+                </view>
+                <view class="tag-row" wx:if="{{item.tags && item.tags.length}}">
+                  <text class="tag" wx:for="{{item.tags}}" wx:for-item="tag" wx:key="*this">{{tag}}</text>
+                </view>
+                <text class="dish-desc">{{item.desc}}</text>
+                <view class="dish-option-preview" wx:if="{{item.options && item.options.length}}">
+                  <text class="dish-option-chip" wx:for="{{item.options}}" wx:for-item="option" wx:key="id">{{option.name}}</text>
+                </view>
+                <view class="dish-cart-action">
+                  <view wx:if="{{item.options && item.options.length}}" class="spec-action-wrap">
+                    <button class="spec-button" data-id="{{item.id}}" bindtap="addDish">选规格</button>
+                    <text wx:if="{{item.cartQuantity > 0}}" class="dish-cart-count">{{item.cartQuantity}}</text>
+                  </view>
+                  <view wx:else class="quick-action-wrap">
+                    <view wx:if="{{item.cartQuantity > 0}}" class="card-stepper">
+                      <button class="stepper-button" data-key="{{item.directSelectionKey}}" bindtap="decreaseCartItem">-</button>
+                      <text class="stepper-count">{{item.cartQuantity}}</text>
+                      <button class="stepper-button stepper-plus" data-id="{{item.id}}" bindtap="addDish">+</button>
+                    </view>
+                    <button wx:else class="quick-add-button" data-id="{{item.id}}" bindtap="addDish">+</button>
+                  </view>
+                </view>
+              </view>
             </view>
           </view>
-        </view>
+        </block>
       </block>
+      <view wx:else class="empty-state">
+        <text>暂无菜品</text>
+      </view>
     </scroll-view>
   </view>
 
-  <view class="selected-bar">
-    <view class="selected-summary">
-      <text class="selected-count">已选 {{selectedCount}} 份</text>
-      <text class="selected-total">模拟合计 ¥{{selectedTotal}}</text>
+  <view wx:if="{{cartVisible}}" class="cart-mask" bindtap="hideCartPanel">
+    <view class="cart-panel" catchtap="stopTap">
+      <view class="cart-header">
+        <text class="cart-title">购物车</text>
+      </view>
+      <scroll-view class="cart-list" scroll-y enhanced show-scrollbar="{{false}}">
+        <block wx:for="{{selectedItems}}" wx:key="selectionKey">
+          <view class="cart-item">
+            <view class="cart-item-info">
+              <view class="cart-item-title-row">
+                <text class="cart-item-name">{{item.name}}</text>
+                <text wx:if="{{item.optionText}}" class="cart-item-options">{{item.optionText}}</text>
+              </view>
+              <text class="cart-item-price">小计 ¥{{item.itemTotal}}</text>
+            </view>
+            <view class="cart-item-controls">
+              <view class="cart-stepper">
+                <button class="stepper-button" data-key="{{item.selectionKey}}" bindtap="decreaseCartItem">-</button>
+                <text class="stepper-count">{{item.quantity}}</text>
+                <button class="stepper-button stepper-plus" data-key="{{item.selectionKey}}" bindtap="increaseCartItem">+</button>
+              </view>
+            </view>
+          </view>
+        </block>
+      </scroll-view>
     </view>
-    <button wx:if="{{selectedCount > 0}}" class="clear-button" bindtap="clearSelected">清空</button>
-    <button class="disabled-order-button">仅展示，不可下单</button>
+  </view>
+
+  <view class="cart-bar">
+    <view class="cart-entry" bindtap="toggleCartPanel">
+      <view class="cart-icon-wrap">
+        <text class="cart-icon">购</text>
+        <text wx:if="{{selectedCount > 0}}" class="cart-badge">{{selectedCount}}</text>
+      </view>
+      <view class="cart-summary">
+        <text class="cart-total">¥{{selectedTotal}}</text>
+        <text class="cart-hint">{{selectedSummaryText}}</text>
+      </view>
+    </view>
+    <view class="cart-actions">
+      <button class="copy-button" bindtap="copySelectedMenu">复制已选</button>
+    </view>
   </view>
 
   <view wx:if="{{detailVisible}}" class="modal-mask" bindtap="hideDetail">
     <view class="detail-panel" catchtap="stopTap">
-      <image class="detail-image" src="{{currentItem.image}}" mode="aspectFill"></image>
-      <view class="detail-body">
-        <view class="detail-title-row">
-          <text class="detail-title">{{currentItem.name}}</text>
-          <text wx:if="{{currentItem.price}}" class="detail-price">¥{{currentItem.price}}</text>
+      <scroll-view class="detail-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+        <image
+          class="detail-image"
+          src="{{currentItem.image}}"
+          mode="aspectFill"
+          data-id="{{currentItem.id}}"
+          binderror="handleImageError"
+        ></image>
+        <view class="detail-body">
+          <view class="detail-title-row">
+            <text class="detail-title">{{currentItem.name}}</text>
+            <text wx:if="{{currentItem.price}}" class="detail-price">¥{{currentItem.price}}</text>
+          </view>
+          <text class="detail-desc">{{currentItem.desc}}</text>
+          <view class="tag-row detail-tags" wx:if="{{currentItem.tags && currentItem.tags.length}}">
+            <text class="tag" wx:for="{{currentItem.tags}}" wx:for-item="tag" wx:key="*this">{{tag}}</text>
+          </view>
+          <view class="option-section" wx:if="{{currentItem.options && currentItem.options.length}}">
+            <block wx:for="{{currentItem.options}}" wx:for-item="option" wx:key="id">
+              <view class="option-group">
+                <view class="option-title-row">
+                  <text class="option-title">{{option.name}}</text>
+                  <text wx:if="{{option.required}}" class="option-required">必选</text>
+                </view>
+                <view class="option-choice-row">
+                  <block wx:for="{{option.choices}}" wx:for-item="choice" wx:key="id">
+                    <button
+                      class="option-choice {{choice.selected ? 'option-choice-active' : ''}}"
+                      data-option-id="{{option.id}}"
+                      data-choice-id="{{choice.id}}"
+                      bindtap="selectOption"
+                    >
+                      {{choice.name}}
+                    </button>
+                  </block>
+                </view>
+              </view>
+            </block>
+            <text wx:if="{{optionNotice}}" class="option-notice">{{optionNotice}}</text>
+          </view>
         </view>
-        <text class="detail-desc">{{currentItem.desc}}</text>
-        <view class="tag-row detail-tags" wx:if="{{currentItem.tags && currentItem.tags.length}}">
-          <text class="tag" wx:for="{{currentItem.tags}}" wx:for-item="tag" wx:key="*this">{{tag}}</text>
-        </view>
-        <view class="detail-actions">
-          <button class="close-button" bindtap="hideDetail">关闭</button>
-          <button class="add-button detail-add" data-id="{{currentItem.id}}" bindtap="addDish">加入展示菜单</button>
-        </view>
+      </scroll-view>
+      <view class="detail-actions">
+        <button class="close-button" bindtap="hideDetail">关闭</button>
+        <button class="add-button detail-add" bindtap="confirmAddDish">加入购物车</button>
       </view>
     </view>
   </view>
