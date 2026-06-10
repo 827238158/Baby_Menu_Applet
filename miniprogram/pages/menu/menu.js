@@ -51,7 +51,7 @@ function getPageStyle(shop) {
   }
 
   return [
-    'background-image: linear-gradient(rgba(247, 244, 239, 0.9), rgba(247, 244, 239, 0.96)), url("' + shop.pageBackgroundImage + '")',
+    'background-image: linear-gradient(rgba(250, 250, 248, 0.92), rgba(247, 247, 245, 0.97)), url("' + shop.pageBackgroundImage + '")',
     'background-size: cover',
     'background-position: center top'
   ].join(';')
@@ -65,7 +65,7 @@ function getHeaderStyle(shop) {
   const position = shop.headerBackgroundPosition || 'center center'
 
   return [
-    'background-image: linear-gradient(135deg, rgba(49, 85, 69, 0.88) 0%, rgba(201, 121, 79, 0.82) 100%), url("' + shop.headerBackgroundImage + '")',
+    'background-image: linear-gradient(135deg, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.06) 100%), url("' + shop.headerBackgroundImage + '")',
     'background-size: cover',
     'background-position: ' + position
   ].join(';')
@@ -90,7 +90,11 @@ Page({
     detailVisible: false,
     currentItem: null,
     optionSelections: {},
-    optionNotice: ''
+    optionNotice: '',
+    optionSummaryText: '请选择规格',
+    optionReady: false,
+    detailSheetStyle: '',
+    detailDragStartY: 0
   },
 
   onLoad() {
@@ -139,7 +143,11 @@ Page({
       detailVisible: false,
       currentItem: null,
       optionSelections: {},
-      optionNotice: ''
+      optionNotice: '',
+      optionSummaryText: '请选择规格',
+      optionReady: false,
+      detailSheetStyle: '',
+      detailDragStartY: 0
     })
   },
 
@@ -151,7 +159,7 @@ Page({
     }
 
     if (item.options && item.options.length) {
-      this.openDetail(item, {})
+      this.openDetail(item, this.getDefaultOptionSelections(item))
       return
     }
 
@@ -207,7 +215,9 @@ Page({
     this.setData({
       optionSelections,
       optionNotice: '',
-      currentItem: this.prepareItemForDetail(this.data.currentItem, optionSelections)
+      currentItem: this.prepareItemForDetail(this.data.currentItem, optionSelections),
+      optionSummaryText: this.getOptionSummaryText(this.data.currentItem, optionSelections),
+      optionReady: this.areRequiredOptionsSelected(this.data.currentItem, optionSelections)
     })
   },
 
@@ -281,11 +291,65 @@ Page({
 
   stopTap() {},
 
-  openDetail(item, optionSelections) {
+  handleDetailDragStart(event) {
+    const touch = event.touches && event.touches[0]
+
+    if (!touch) {
+      return
+    }
+
     this.setData({
-      currentItem: this.prepareItemForDetail(item, optionSelections),
-      optionSelections,
+      detailDragStartY: touch.clientY,
+      detailSheetStyle: ''
+    })
+  },
+
+  handleDetailDragMove(event) {
+    const touch = event.touches && event.touches[0]
+
+    if (!touch || !this.data.detailDragStartY) {
+      return
+    }
+
+    const offsetY = Math.max(0, touch.clientY - this.data.detailDragStartY)
+
+    if (offsetY <= 0) {
+      return
+    }
+
+    this.setData({
+      detailSheetStyle: 'transform: translateY(' + offsetY + 'px); transition: none;'
+    })
+  },
+
+  handleDetailDragEnd(event) {
+    const touch = event.changedTouches && event.changedTouches[0]
+    const offsetY = touch && this.data.detailDragStartY
+      ? Math.max(0, touch.clientY - this.data.detailDragStartY)
+      : 0
+
+    if (offsetY > 88) {
+      this.hideDetail()
+      return
+    }
+
+    this.setData({
+      detailSheetStyle: '',
+      detailDragStartY: 0
+    })
+  },
+
+  openDetail(item, optionSelections) {
+    const normalizedSelections = optionSelections || this.getDefaultOptionSelections(item)
+
+    this.setData({
+      currentItem: this.prepareItemForDetail(item, normalizedSelections),
+      optionSelections: normalizedSelections,
       optionNotice: '',
+      optionSummaryText: this.getOptionSummaryText(item, normalizedSelections),
+      optionReady: this.areRequiredOptionsSelected(item, normalizedSelections),
+      detailSheetStyle: '',
+      detailDragStartY: 0,
       detailVisible: true
     })
   },
@@ -300,6 +364,18 @@ Page({
     return Object.assign({}, item, {
       options
     })
+  },
+
+  getDefaultOptionSelections(item) {
+    return (item.options || []).reduce((selections, option) => {
+      const firstChoice = (option.choices || [])[0]
+
+      if (firstChoice) {
+        selections[option.id] = firstChoice.id
+      }
+
+      return selections
+    }, {})
   },
 
   findDish(id) {
@@ -331,6 +407,16 @@ Page({
     })
 
     return false
+  },
+
+  areRequiredOptionsSelected(item, optionSelections) {
+    return !(item.options || []).some((option) => option.required && !optionSelections[option.id])
+  },
+
+  getOptionSummaryText(item, optionSelections) {
+    const optionText = this.getOptionText(item, optionSelections)
+
+    return optionText || '请选择规格'
   },
 
   addDishWithSelections(item, optionSelections) {
@@ -460,8 +546,7 @@ Page({
       lines.push((index + 1) + '. ' + item.name + optionText + ' x' + item.quantity)
     })
 
-    lines.push('模拟合计：¥' + this.data.selectedTotal)
-    lines.push('仅展示，不代表真实下单。')
+    lines.push('合计：¥' + this.data.selectedTotal)
 
     return lines.join('\n')
   },
