@@ -52,12 +52,23 @@
 
 ## 如何继续改菜单
 
-现在主要编辑这些本地表格式数据文件：
+现在主要编辑 Excel 源数据文件：
 
-- `miniprogram/data/shop-data.js`：店铺名、分享标题、分享图、页面背景图、顶部背景图
-- `miniprogram/data/category-data.js`：分类名称和排序
-- `miniprogram/data/dish-data.js`：餐品、价格、标签、图片和规格选项
-- `miniprogram/data/menu-data.js`：自动聚合入口，一般不需要手动修改
+- `tools/menu-workbook/menu-data.xlsx`：店铺、分类、商品、标签和规格的日常维护入口
+
+修改后运行：
+
+```powershell
+node tools\generate-menu-data.js
+```
+
+脚本会生成：
+
+- `miniprogram/data/shop-data.js`
+- `miniprogram/data/category-data.js`
+- `miniprogram/data/dish-data.js`
+
+`miniprogram/data/menu-data.js` 是自动聚合入口，一般不需要手动修改。
 
 更完整的自定义替换说明见 `CUSTOMIZATION.md`。
 
@@ -100,5 +111,6 @@
 ## 技术说明
 
 - 只使用微信原生 WXML、WXSS、JS、JSON。
-- 不需要 Node.js、npm、webpack、Taro、uni-app 或其他编译依赖。
+- 小程序本身不需要 npm、webpack、Taro、uni-app 或其他编译依赖。
+- 菜单数据生成脚本需要本地 Node.js 调用 Python，并由 Python `openpyxl` 读取 Excel。
 - 目前所有交互状态只存在页面内，刷新后会重置。
