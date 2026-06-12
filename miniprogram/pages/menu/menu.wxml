@@ -1,5 +1,12 @@
 <view class="page" style="{{pageStyle}}">
-  <view class="shop-header" style="{{headerStyle}}">
+  <view class="shop-header">
+    <image
+      wx:if="{{shop.headerBackgroundImage}}"
+      class="shop-header-bg"
+      src="{{shop.headerBackgroundImage}}"
+      mode="aspectFill"
+    ></image>
+    <view class="shop-header-overlay"></view>
     <view class="shop-copy">
       <text class="shop-name">{{shop.name}}</text>
       <text class="shop-subtitle">{{shop.subtitle}}</text>

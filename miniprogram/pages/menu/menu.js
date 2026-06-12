@@ -1,6 +1,7 @@
 import menuData from '../../data/menu-data.js'
 
 const FALLBACK_IMAGE = '../../assets/placeholder-food.jpg'
+const SHARE_IMAGE = '../../assets/share.jpg'
 const SHARE_PATH = '/pages/menu/menu'
 
 function normalizeChoice(choice) {
@@ -57,18 +58,12 @@ function getPageStyle(shop) {
   ].join(';')
 }
 
-function getHeaderStyle(shop) {
-  if (!shop.headerBackgroundImage) {
-    return ''
+function getShareConfig(shop) {
+  return {
+    title: shop.shareTitle || shop.name,
+    path: SHARE_PATH,
+    imageUrl: shop.shareImage || SHARE_IMAGE
   }
-
-  const position = shop.headerBackgroundPosition || 'center center'
-
-  return [
-    'background-image: linear-gradient(135deg, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.06) 100%), url("' + shop.headerBackgroundImage + '")',
-    'background-size: cover',
-    'background-position: ' + position
-  ].join(';')
 }
 
 const normalizedCategories = normalizeCategories(menuData.categories)
@@ -77,7 +72,6 @@ Page({
   data: {
     shop: menuData.shop,
     pageStyle: getPageStyle(menuData.shop),
-    headerStyle: getHeaderStyle(menuData.shop),
     categories: normalizedCategories,
     dishCount: getDishCount(normalizedCategories),
     activeCategoryId: '',
@@ -100,6 +94,13 @@ Page({
   onLoad() {
     const firstCategory = this.data.categories[0] || { id: '', items: [] }
 
+    if (wx.showShareMenu) {
+      wx.showShareMenu({
+        withShareTicket: false,
+        menus: ['shareAppMessage']
+      })
+    }
+
     this.setData({
       activeCategoryId: firstCategory.id,
       activeItems: firstCategory.items || []
@@ -107,10 +108,16 @@ Page({
   },
 
   onShareAppMessage() {
+    return getShareConfig(this.data.shop)
+  },
+
+  onShareTimeline() {
+    const shareConfig = getShareConfig(this.data.shop)
+
     return {
-      title: this.data.shop.shareTitle,
-      path: SHARE_PATH,
-      imageUrl: this.data.shop.shareImage
+      title: shareConfig.title,
+      query: '',
+      imageUrl: shareConfig.imageUrl
     }
   },
 

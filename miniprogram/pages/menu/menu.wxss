@@ -16,22 +16,43 @@ button::after {
 }
 
 .shop-header {
+  position: relative;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 24rpx;
   box-sizing: border-box;
+  overflow: hidden;
+  min-height: 188rpx;
   padding: 36rpx 32rpx;
   border: 1rpx solid rgba(255, 255, 255, 0.5);
   border-radius: 28rpx;
   color: #ffffff;
   background: linear-gradient(135deg, rgba(32, 32, 30, 0.48) 0%, rgba(32, 32, 30, 0.12) 100%);
-  background-repeat: no-repeat;
-  background-size: cover;
   box-shadow: 0 18rpx 42rpx rgba(68, 60, 56, 0.16);
 }
 
+.shop-header-bg,
+.shop-header-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.shop-header-bg {
+  width: 100%;
+  height: 100%;
+}
+
+.shop-header-overlay {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.06) 100%);
+}
+
 .shop-copy {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex: 1;
   min-width: 0;

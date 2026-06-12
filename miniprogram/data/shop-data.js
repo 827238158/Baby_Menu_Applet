@@ -6,5 +6,5 @@ export default {
   "shareImage": "../../assets/share.jpg",
   "pageBackgroundImage": "../../assets/backgrounds/page-bg.jpg",
   "headerBackgroundImage": "../../assets/backgrounds/header-bg.jpg",
-  "headerBackgroundPosition": "center 60%"
+  "headerBackgroundPosition": "center 50%"
 }
