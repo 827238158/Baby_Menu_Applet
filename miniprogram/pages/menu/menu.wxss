@@ -139,11 +139,27 @@ button::after {
 }
 
 .category-name {
-  display: block;
+  display: -webkit-box;
   overflow: hidden;
   max-width: 100%;
+  line-height: 1.22;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-all;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.category-empty-label {
+  display: block;
+  max-width: 100%;
+  padding: 3rpx 8rpx;
+  border-radius: 999rpx;
+  font-size: 18rpx;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #a58f89;
+  background: #f4f3f1;
 }
 
 .category-count {
@@ -478,6 +494,8 @@ button::after {
 }
 
 .cart-panel {
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   box-sizing: border-box;
   width: 100%;
@@ -505,7 +523,47 @@ button::after {
 }
 
 .cart-list {
-  max-height: calc(58vh - 76rpx);
+  flex: 1;
+  min-height: 0;
+  max-height: calc(58vh - 172rpx);
+}
+
+.cart-remark {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 14rpx;
+  box-sizing: border-box;
+  padding: 18rpx 20rpx 20rpx;
+  border-top: 1rpx solid #f4ece8;
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.cart-remark-label {
+  flex: 0 0 auto;
+  font-size: 24rpx;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #2d2926;
+}
+
+.cart-remark-input {
+  display: block;
+  flex: 1;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 58rpx;
+  padding: 0 18rpx;
+  border: 1rpx solid #efe1dc;
+  border-radius: 999rpx;
+  font-size: 23rpx;
+  line-height: 58rpx;
+  color: #2d2926;
+  background: #f9f7f5;
+}
+
+.cart-remark-placeholder {
+  color: #b7a9a3;
 }
 
 .cart-item {
@@ -517,10 +575,19 @@ button::after {
   border-bottom: 1rpx solid #f0eee9;
 }
 
+.cart-item-image {
+  flex: 0 0 auto;
+  width: 76rpx;
+  height: 76rpx;
+  border-radius: 12rpx;
+  background: #f3e9e5;
+}
+
 .cart-item-info {
   display: flex;
   flex: 1;
   overflow: hidden;
+  width: 0;
   min-width: 0;
   flex-direction: column;
   gap: 8rpx;
@@ -627,8 +694,34 @@ button::after {
 }
 
 .cart-icon {
-  font-size: 25rpx;
-  font-weight: 700;
+  position: relative;
+  width: 42rpx;
+  height: 44rpx;
+}
+
+.cart-icon-handle {
+  position: absolute;
+  top: 2rpx;
+  left: 11rpx;
+  box-sizing: border-box;
+  width: 20rpx;
+  height: 18rpx;
+  border: 4rpx solid #ffffff;
+  border-bottom: 0;
+  border-radius: 999rpx 999rpx 0 0;
+  background: transparent;
+}
+
+.cart-icon-bag {
+  position: absolute;
+  right: 4rpx;
+  bottom: 2rpx;
+  left: 4rpx;
+  box-sizing: border-box;
+  height: 30rpx;
+  border: 4rpx solid #ffffff;
+  border-radius: 8rpx 8rpx 10rpx 10rpx;
+  background: transparent;
 }
 
 .cart-badge {
@@ -717,6 +810,10 @@ button::after {
   box-shadow: 0 -18rpx 48rpx rgba(80, 54, 58, 0.18);
   animation: sheet-slide-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
   transition: transform 180ms ease-out;
+}
+
+.detail-drag-zone {
+  flex: 0 0 auto;
 }
 
 .sheet-drag-area {
@@ -879,6 +976,30 @@ button::after {
   margin-top: 16rpx;
 }
 
+.option-input-wrap {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 16rpx;
+}
+
+.option-input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 64rpx;
+  padding: 0 20rpx;
+  border: 1rpx solid #eadbd8;
+  border-radius: 14rpx;
+  font-size: 23rpx;
+  line-height: 64rpx;
+  color: #2d2926;
+  background: #ffffff;
+}
+
+.option-input-placeholder {
+  color: #b7a9a3;
+}
+
 .option-choice {
   display: inline-flex;
   align-items: center;
@@ -1039,6 +1160,13 @@ button::after {
     gap: 10rpx 8rpx;
   }
 
+  .option-input {
+    height: 58rpx;
+    padding: 0 16rpx;
+    font-size: 21rpx;
+    line-height: 58rpx;
+  }
+
   .option-choice {
     min-height: 44rpx;
     padding: 0 12rpx;
@@ -1049,6 +1177,12 @@ button::after {
   .cart-item {
     gap: 8rpx;
     padding: 14rpx;
+  }
+
+  .cart-item-image {
+    width: 64rpx;
+    height: 64rpx;
+    border-radius: 10rpx;
   }
 
   .cart-item-controls {
@@ -1064,6 +1198,22 @@ button::after {
     height: 36rpx;
     min-height: 36rpx;
     line-height: 32rpx;
+  }
+
+  .cart-remark {
+    gap: 10rpx;
+    padding: 14rpx 16rpx 16rpx;
+  }
+
+  .cart-remark-label {
+    font-size: 22rpx;
+  }
+
+  .cart-remark-input {
+    height: 52rpx;
+    padding: 0 14rpx;
+    font-size: 21rpx;
+    line-height: 52rpx;
   }
 
   .cart-mask {

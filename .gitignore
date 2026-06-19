@@ -1,1 +1,6 @@
 .tmp-product-images/
+tools/__pycache__/
+**/__pycache__/
+miniprogram/assets.lnk
+截图*.png
+*.tmp.png

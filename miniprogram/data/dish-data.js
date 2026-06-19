@@ -20,7 +20,27 @@ export default [
     "price": "0",
     "image": "../../assets/foods/Ramen.jpg",
     "tags": [],
-    "options": []
+    "options": [
+      {
+        "id": "辣度",
+        "name": "辣度",
+        "required": true,
+        "choices": [
+          "不辣",
+          "微辣"
+        ]
+      },
+      {
+        "id": "香菜",
+        "name": "香菜",
+        "required": true,
+        "choices": [
+          "多香菜",
+          "少香菜",
+          "不要香菜"
+        ]
+      }
+    ]
   },
   {
     "id": "fruit11",
@@ -30,7 +50,11 @@ export default [
     "desc": "",
     "price": "0",
     "image": "../../assets/foods/durian.jpg",
-    "tags": [],
+    "tags": [
+      "夏季",
+      "热性",
+      "易上火"
+    ],
     "options": []
   },
   {
@@ -111,13 +135,110 @@ export default [
     ]
   },
   {
+    "id": "MOLLY TEA01",
+    "categoryId": "MOLLY TEA",
+    "order": 10,
+    "name": "开心果茉莉椰",
+    "desc": "无花果碎+茉莉针王+泰国椰皇水+开心果芝士建议不使用吸管，直接饮用体验更佳。",
+    "price": "0",
+    "image": "../../assets/foods/MollyTea01.jpg",
+    "tags": [
+      "椰香升级"
+    ],
+    "options": [
+      {
+        "id": "杯型",
+        "name": "杯型",
+        "required": true,
+        "choices": [
+          "中杯"
+        ]
+      },
+      {
+        "id": "温度",
+        "name": "温度",
+        "required": true,
+        "choices": [
+          "正常冰（推荐）",
+          "少冰"
+        ]
+      },
+      {
+        "id": "甜度",
+        "name": "甜度",
+        "required": true,
+        "choices": [
+          "正常糖",
+          "七分糖",
+          "五分糖（推荐）",
+          "三分糖",
+          "不另外加糖"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "GOOD ME01",
+    "categoryId": "GOOD ME",
+    "order": 10,
+    "name": "云岭茉莉",
+    "desc": "广西横州七窨茉莉花茶。",
+    "price": "0",
+    "image": "../../assets/foods/MilkTea04.jpg",
+    "tags": [
+      "冷链鲜奶"
+    ],
+    "options": [
+      {
+        "id": "规格",
+        "name": "规格",
+        "required": true,
+        "choices": [
+          "中杯",
+          "大杯"
+        ]
+      },
+      {
+        "id": "温度",
+        "name": "温度",
+        "required": true,
+        "choices": [
+          "少冰（推荐）",
+          "温",
+          "热",
+          "去冰"
+        ]
+      },
+      {
+        "id": "选糖",
+        "name": "选糖",
+        "required": true,
+        "choices": [
+          "默认糖"
+        ]
+      },
+      {
+        "id": "甜度",
+        "name": "甜度",
+        "required": true,
+        "choices": [
+          "七分甜（推荐）",
+          "五分甜",
+          "三分甜",
+          "十分甜",
+          "不另外加糖（不推荐）"
+        ]
+      }
+    ]
+  },
+  {
     "id": "NO YEYE NO TEA01",
     "categoryId": "NO YEYE NO TEA",
     "order": 10,
     "name": "桃桃双皮奶",
     "desc": "七窨茉莉花茶融入新鲜蜜桃爆汁果肉，撞入Q弹的双皮奶和牛奶，满口茉莉清香而不腻，鲜甜爽口。",
     "price": "0",
-    "image": "../../assets/placeholder-food.jpg",
+    "image": "../../assets/foods/MilkTea03.jpg",
     "tags": [
       "Q弹奶冻",
       "清甜蜜桃"
@@ -185,7 +306,11 @@ export default [
     "desc": "",
     "price": "0",
     "image": "../../assets/foods/coconut.jpg",
-    "tags": [],
+    "tags": [
+      "夏季",
+      "偏凉",
+      "下火"
+    ],
     "options": []
   },
   {
@@ -288,13 +413,120 @@ export default [
     ]
   },
   {
+    "id": "MOLLY TEA02",
+    "categoryId": "MOLLY TEA",
+    "order": 20,
+    "name": "茉莉奶白",
+    "desc": "茉莉龙芽+牛奶，搭配优质牛乳，甘醇鲜爽、香气悠长。",
+    "price": "0",
+    "image": "../../assets/foods/MollyTea01.jpg",
+    "tags": [
+      "招牌",
+      "可选热饮"
+    ],
+    "options": [
+      {
+        "id": "杯型",
+        "name": "杯型",
+        "required": true,
+        "choices": [
+          "大杯",
+          "中杯"
+        ]
+      },
+      {
+        "id": "温度",
+        "name": "温度",
+        "required": true,
+        "choices": [
+          "正常冰",
+          "少冰（推荐）",
+          "去冰（8分满）",
+          "热饮"
+        ]
+      },
+      {
+        "id": "甜度",
+        "name": "甜度",
+        "required": true,
+        "choices": [
+          "正常糖",
+          "七分糖（推荐）",
+          "五分糖",
+          "三分糖",
+          "不另外加糖"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "GOOD ME02",
+    "categoryId": "GOOD ME",
+    "order": 20,
+    "name": "云深幽兰",
+    "desc": "鲜打香草籽奶芙顶，奶芙受热易化。茶底以产自斯里兰卡的锡兰红茶为主，拼配中国云南及印度红茶。",
+    "price": "0",
+    "image": "../../assets/foods/MilkTea04.jpg",
+    "tags": [
+      "锡兰高山红茶"
+    ],
+    "options": [
+      {
+        "id": "规格",
+        "name": "规格",
+        "required": true,
+        "choices": [
+          "中杯"
+        ]
+      },
+      {
+        "id": "去料",
+        "name": "去料",
+        "required": true,
+        "choices": [
+          "去坚果碎"
+        ]
+      },
+      {
+        "id": "温度",
+        "name": "温度",
+        "required": true,
+        "choices": [
+          "少冰（推荐）",
+          "温",
+          "热"
+        ]
+      },
+      {
+        "id": "选糖",
+        "name": "选糖",
+        "required": true,
+        "choices": [
+          "默认糖"
+        ]
+      },
+      {
+        "id": "甜度",
+        "name": "甜度",
+        "required": true,
+        "choices": [
+          "七分甜（推荐）",
+          "五分甜",
+          "三分甜",
+          "十分甜",
+          "不另外加糖（不推荐）"
+        ]
+      }
+    ]
+  },
+  {
     "id": "NO YEYE NO TEA02",
     "categoryId": "NO YEYE NO TEA",
     "order": 20,
     "name": "荔枝冰酿",
     "desc": "爷爷不泡茶首创，荔枝的鲜、冰酿的醇与花魁单丛的甘爽，碰撞层层鲜甜。孝感米酿升级，冰凉软的咀嚼惊喜。",
     "price": "0",
-    "image": "../../assets/placeholder-food.jpg",
+    "image": "../../assets/foods/MilkTea03.jpg",
     "tags": [
       "非遗米酿",
       "经典必喝"
@@ -351,7 +583,7 @@ export default [
     "tags": [
       "夏季",
       "寒凉",
-      "清爽"
+      "下火"
     ],
     "options": []
   },
@@ -424,13 +656,122 @@ export default [
     ]
   },
   {
+    "id": "MOLLY TEA03",
+    "categoryId": "MOLLY TEA",
+    "order": 30,
+    "name": "栀子奶白",
+    "desc": "五斤栀子一斤茶，五倍栀香入茶，张扬释香。含:栀香绿茶+牛奶。",
+    "price": "0",
+    "image": "../../assets/foods/MollyTea01.jpg",
+    "tags": [
+      "可选热饮"
+    ],
+    "options": [
+      {
+        "id": "杯型",
+        "name": "杯型",
+        "required": true,
+        "choices": [
+          "大杯",
+          "中杯"
+        ]
+      },
+      {
+        "id": "温度",
+        "name": "温度",
+        "required": true,
+        "choices": [
+          "正常冰",
+          "少冰（推荐）",
+          "去冰（8分满）",
+          "热饮"
+        ]
+      },
+      {
+        "id": "甜度",
+        "name": "甜度",
+        "required": true,
+        "choices": [
+          "正常糖",
+          "七分糖（推荐）",
+          "五分糖",
+          "三分糖",
+          "不另外加糖"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "GOOD ME03",
+    "categoryId": "GOOD ME",
+    "order": 30,
+    "name": "超A芝士桃桃",
+    "desc": "时令水蜜桃+桃汁+芝士奶盖+Q弹多肉+四季春乌龙，鲜活风味，严选龙泉驿等时令产区水蜜桃。",
+    "price": "0",
+    "image": "../../assets/foods/MilkTea04.jpg",
+    "tags": [
+      "手剥现捣",
+      "Q弹多肉"
+    ],
+    "options": [
+      {
+        "id": "规格",
+        "name": "规格",
+        "required": true,
+        "choices": [
+          "中杯",
+          "大杯"
+        ]
+      },
+      {
+        "id": "加料",
+        "name": "加料",
+        "required": true,
+        "choices": [
+          "桃桃果茸",
+          "多肉",
+          "椰果",
+          "西米",
+          "西柚粒"
+        ]
+      },
+      {
+        "id": "温度",
+        "name": "温度",
+        "required": true,
+        "choices": [
+          "沙冰（推荐）"
+        ]
+      },
+      {
+        "id": "选糖",
+        "name": "选糖",
+        "required": true,
+        "choices": [
+          "默认糖"
+        ]
+      },
+      {
+        "id": "甜度",
+        "name": "甜度",
+        "required": true,
+        "choices": [
+          "七分甜（推荐）",
+          "五分甜",
+          "十分甜",
+          "不另外加糖"
+        ]
+      }
+    ]
+  },
+  {
     "id": "NO YEYE NO TEA03",
     "categoryId": "NO YEYE NO TEA",
     "order": 30,
     "name": "空山栀子",
     "desc": "甄选乐山子，独特天然奶香，福建大白毫与四川毛峰双茶底，栀子与茶比例3:1!入口清新甘甜，回味温润奶香！",
     "price": "0",
-    "image": "../../assets/placeholder-food.jpg",
+    "image": "../../assets/foods/MilkTea03.jpg",
     "tags": [
       "三倍奶香",
       "喝栀子"
@@ -480,7 +821,7 @@ export default [
     "tags": [
       "夏季",
       "平性",
-      "酸甜"
+      "不易上火"
     ],
     "options": []
   },
@@ -496,6 +837,37 @@ export default [
       "辣"
     ],
     "options": []
+  },
+  {
+    "id": "breakfast04",
+    "categoryId": "breakfast",
+    "order": 40,
+    "name": "馄饨",
+    "desc": "",
+    "price": "0",
+    "image": "../../assets/placeholder-food.jpg",
+    "tags": [],
+    "options": [
+      {
+        "id": "规格",
+        "name": "规格",
+        "required": true,
+        "choices": [
+          "小份",
+          "大份"
+        ]
+      },
+      {
+        "id": "馄饨馅",
+        "name": "馄饨馅",
+        "required": true,
+        "choices": [
+          "荠菜",
+          "三鲜",
+          "猪肉"
+        ]
+      }
+    ]
   },
   {
     "id": "Come Wonka04",
@@ -534,13 +906,121 @@ export default [
     ]
   },
   {
+    "id": "MOLLY TEA04",
+    "categoryId": "MOLLY TEA",
+    "order": 40,
+    "name": "白兰",
+    "desc": "前调清竹叶香，中调清雅梨子香，尾调栗香熟乳香。含:兰香甘露+牛奶，热饮推荐五分糖。",
+    "price": "0",
+    "image": "../../assets/foods/MollyTea01.jpg",
+    "tags": [
+      "可选热饮"
+    ],
+    "options": [
+      {
+        "id": "杯型",
+        "name": "杯型",
+        "required": true,
+        "choices": [
+          "大杯",
+          "中杯"
+        ]
+      },
+      {
+        "id": "温度",
+        "name": "温度",
+        "required": true,
+        "choices": [
+          "正常冰",
+          "少冰（推荐）",
+          "去冰（8分满）",
+          "热饮"
+        ]
+      },
+      {
+        "id": "甜度",
+        "name": "甜度",
+        "required": true,
+        "choices": [
+          "正常糖",
+          "七分糖（推荐）",
+          "五分糖",
+          "三分糖",
+          "不另外加糖"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "GOOD ME04",
+    "categoryId": "GOOD ME",
+    "order": 40,
+    "name": "超A多肉葡萄",
+    "desc": "现剥时令葡萄，搭配清冽茉莉花茶与Q弹多肉小料。",
+    "price": "0",
+    "image": "../../assets/foods/MilkTea04.jpg",
+    "tags": [
+      "现剥葡萄果肉"
+    ],
+    "options": [
+      {
+        "id": "规格",
+        "name": "规格",
+        "required": true,
+        "choices": [
+          "大杯"
+        ]
+      },
+      {
+        "id": "加料",
+        "name": "加料",
+        "required": true,
+        "choices": [
+          "椰果",
+          "芦荟",
+          "粉宝石",
+          "葡萄鲜果肉",
+          "西柚粒"
+        ]
+      },
+      {
+        "id": "温度",
+        "name": "温度",
+        "required": true,
+        "choices": [
+          "少冰（推荐）"
+        ]
+      },
+      {
+        "id": "选糖",
+        "name": "选糖",
+        "required": true,
+        "choices": [
+          "默认糖"
+        ]
+      },
+      {
+        "id": "甜度",
+        "name": "甜度",
+        "required": true,
+        "choices": [
+          "七分甜（推荐）",
+          "五分甜",
+          "三分甜",
+          "十分甜",
+          "不另外加糖"
+        ]
+      }
+    ]
+  },
+  {
     "id": "NO YEYE NO TEA04",
     "categoryId": "NO YEYE NO TEA",
     "order": 40,
     "name": "兰香青柠",
     "desc": "清冽鲜灵的白兰玉露茶汤融合鲜活青柠，最后撒上青柠皮碎，于绵密中散发清新果香，三重柠香一口感受！",
     "price": "0",
-    "image": "../../assets/placeholder-food.jpg",
+    "image": "../../assets/foods/MilkTea03.jpg",
     "tags": [
       "三重柠香"
     ],
@@ -605,6 +1085,37 @@ export default [
     "options": []
   },
   {
+    "id": "breakfast05",
+    "categoryId": "breakfast",
+    "order": 50,
+    "name": "水饺",
+    "desc": "",
+    "price": "0",
+    "image": "../../assets/placeholder-food.jpg",
+    "tags": [],
+    "options": [
+      {
+        "id": "规格",
+        "name": "规格",
+        "required": true,
+        "choices": [
+          "小份",
+          "大份"
+        ]
+      },
+      {
+        "id": "水饺馅",
+        "name": "水饺馅",
+        "required": true,
+        "choices": [
+          "荠菜",
+          "三鲜",
+          "猪肉"
+        ]
+      }
+    ]
+  },
+  {
     "id": "Come Wonka05",
     "categoryId": "Come Wonka",
     "order": 50,
@@ -649,13 +1160,120 @@ export default [
     ]
   },
   {
+    "id": "MOLLY TEA05",
+    "categoryId": "MOLLY TEA",
+    "order": 50,
+    "name": "抹茶白兰",
+    "desc": "甄选抹茶粉及安佳奶油，现调抹茶芝士绵密柔滑。含:抹茶芝士+兰香甘露+牛奶。",
+    "price": "0",
+    "image": "../../assets/foods/MollyTea01.jpg",
+    "tags": [
+      "可选热饮"
+    ],
+    "options": [
+      {
+        "id": "杯型",
+        "name": "杯型",
+        "required": true,
+        "choices": [
+          "中杯"
+        ]
+      },
+      {
+        "id": "温度",
+        "name": "温度",
+        "required": true,
+        "choices": [
+          "正常冰",
+          "少冰（推荐）",
+          "去冰",
+          "热饮"
+        ]
+      },
+      {
+        "id": "甜度",
+        "name": "甜度",
+        "required": true,
+        "choices": [
+          "正常糖",
+          "七分糖（推荐）",
+          "五分糖",
+          "三分糖",
+          "不另外加糖"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "GOOD ME05",
+    "categoryId": "GOOD ME",
+    "order": 50,
+    "name": "超A芝士葡萄",
+    "desc": "现剥葡萄果肉+茉莉花茶+葡萄汁+芝士奶盖+多肉。",
+    "price": "0",
+    "image": "../../assets/foods/MilkTea04.jpg",
+    "tags": [
+      "果茶销冠"
+    ],
+    "options": [
+      {
+        "id": "规格",
+        "name": "规格",
+        "required": true,
+        "choices": [
+          "大杯"
+        ]
+      },
+      {
+        "id": "加料",
+        "name": "加料",
+        "required": true,
+        "choices": [
+          "椰果",
+          "芦荟",
+          "粉宝石",
+          "葡萄鲜果肉",
+          "西柚粒"
+        ]
+      },
+      {
+        "id": "温度",
+        "name": "温度",
+        "required": true,
+        "choices": [
+          "少冰（推荐）"
+        ]
+      },
+      {
+        "id": "选糖",
+        "name": "选糖",
+        "required": true,
+        "choices": [
+          "默认糖"
+        ]
+      },
+      {
+        "id": "甜度",
+        "name": "甜度",
+        "required": true,
+        "choices": [
+          "七分甜（推荐）",
+          "五分甜",
+          "三分甜",
+          "十分甜",
+          "不另外加糖"
+        ]
+      }
+    ]
+  },
+  {
     "id": "NO YEYE NO TEA05",
     "categoryId": "NO YEYE NO TEA",
     "order": 50,
     "name": "初恋玫瑰青提",
     "desc": "升级七套武汉茉莉茶底加入酸甜青提汁，入口果香、花香、茶香犹如清风席卷，看得到的青提果肉与马蹄丸子！",
     "price": "0",
-    "image": "../../assets/placeholder-food.jpg",
+    "image": "../../assets/foods/MilkTea03.jpg",
     "tags": [
       "手剥",
       "招牌"
@@ -712,7 +1330,7 @@ export default [
     "tags": [
       "冬春",
       "偏凉",
-      "酸甜"
+      "下火"
     ],
     "options": []
   },
@@ -724,7 +1342,11 @@ export default [
     "desc": "",
     "price": "0",
     "image": "../../assets/foods/cherry.jpg",
-    "tags": [],
+    "tags": [
+      "春夏",
+      "温性",
+      "易上火"
+    ],
     "options": []
   },
   {
@@ -808,13 +1430,56 @@ export default [
     ]
   },
   {
+    "id": "MOLLY TEA06",
+    "categoryId": "MOLLY TEA",
+    "order": 60,
+    "name": "开心小兰花",
+    "desc": "兰香甘露融合海南椰子水，添加浓郁开心果芝士。含:兰香甘露+香椰水+开心果芝士+无花果碎。",
+    "price": "0",
+    "image": "../../assets/foods/MollyTea01.jpg",
+    "tags": [
+      "推荐"
+    ],
+    "options": [
+      {
+        "id": "杯型",
+        "name": "杯型",
+        "required": true,
+        "choices": [
+          "中杯"
+        ]
+      },
+      {
+        "id": "温度",
+        "name": "温度",
+        "required": true,
+        "choices": [
+          "正常冰（推荐）",
+          "少冰"
+        ]
+      },
+      {
+        "id": "甜度",
+        "name": "甜度",
+        "required": true,
+        "choices": [
+          "正常糖",
+          "七分糖",
+          "五分糖（推荐）",
+          "三分糖",
+          "不另外加糖"
+        ]
+      }
+    ]
+  },
+  {
     "id": "NO YEYE NO TEA06",
     "categoryId": "NO YEYE NO TEA",
     "order": 60,
     "name": "武汉茉莉",
     "desc": "升级后的武汉茉莉茶底，优质双莱莉与云南高山茶底大白毫，轻盈奶香之中又透着高昂茉莉花香。",
     "price": "0",
-    "image": "../../assets/placeholder-food.jpg",
+    "image": "../../assets/foods/MilkTea03.jpg",
     "tags": [
       "七窨茉莉",
       "轻盈奶香"
@@ -863,8 +1528,20 @@ export default [
     "image": "../../assets/foods/peach.jpg",
     "tags": [
       "夏季",
-      "偏温"
+      "偏温",
+      "易上火"
     ],
+    "options": []
+  },
+  {
+    "id": "fruit15",
+    "categoryId": "fruit",
+    "order": 65,
+    "name": "香蕉",
+    "desc": "",
+    "price": "0",
+    "image": "../../assets/foods/banana.jpg",
+    "tags": [],
     "options": []
   },
   {
@@ -920,13 +1597,58 @@ export default [
     ]
   },
   {
+    "id": "MOLLY TEA07",
+    "categoryId": "MOLLY TEA",
+    "order": 70,
+    "name": "针王苹果",
+    "desc": "甄选苹果汁，饱含充盈汁水的郁果香，融入高等级的茉莉针王，含:莱莉针王+红苹果汁+牛奶。",
+    "price": "0",
+    "image": "../../assets/foods/MollyTea01.jpg",
+    "tags": [
+      "原创"
+    ],
+    "options": [
+      {
+        "id": "杯型",
+        "name": "杯型",
+        "required": true,
+        "choices": [
+          "中杯",
+          "大杯（纸杯出品）"
+        ]
+      },
+      {
+        "id": "温度",
+        "name": "温度",
+        "required": true,
+        "choices": [
+          "正常冰",
+          "少冰（推荐）",
+          "热"
+        ]
+      },
+      {
+        "id": "甜度",
+        "name": "甜度",
+        "required": true,
+        "choices": [
+          "正常糖",
+          "七分糖（推荐）",
+          "五分糖",
+          "三分糖",
+          "不另外加糖"
+        ]
+      }
+    ]
+  },
+  {
     "id": "NO YEYE NO TEA07",
     "categoryId": "NO YEYE NO TEA",
     "order": 70,
     "name": "白兰玉露",
     "desc": "甄选白兰中上等佳品“建兰”，拼配湖北名茶、恩施城市名片--恩施玉露，经清甜牛奶融合后丝滑入口。",
     "price": "0",
-    "image": "../../assets/placeholder-food.jpg",
+    "image": "../../assets/foods/MilkTea03.jpg",
     "tags": [
       "恩施玉露",
       "馥郁兰香"
@@ -976,7 +1698,7 @@ export default [
     "tags": [
       "秋季",
       "偏凉",
-      "清润"
+      "下火"
     ],
     "options": []
   },
@@ -1037,13 +1759,58 @@ export default [
     ]
   },
   {
+    "id": "MOLLY TEA08",
+    "categoryId": "MOLLY TEA",
+    "order": 80,
+    "name": "针王葡萄",
+    "desc": "沁甜馥郁的夏黑葡萄汁，融入七窨茉莉针王，再与醇滑牛乳相遇，含:夏黑葡萄汁+茉莉针王+牛奶。",
+    "price": "0",
+    "image": "../../assets/foods/MollyTea01.jpg",
+    "tags": [
+      "原创"
+    ],
+    "options": [
+      {
+        "id": "杯型",
+        "name": "杯型",
+        "required": true,
+        "choices": [
+          "中杯",
+          "大杯（纸杯出品）"
+        ]
+      },
+      {
+        "id": "温度",
+        "name": "温度",
+        "required": true,
+        "choices": [
+          "正常冰（推荐）",
+          "少冰",
+          "热"
+        ]
+      },
+      {
+        "id": "甜度",
+        "name": "甜度",
+        "required": true,
+        "choices": [
+          "正常糖",
+          "七分糖（推荐）",
+          "五分糖",
+          "三分糖",
+          "不另外加糖（不推荐）"
+        ]
+      }
+    ]
+  },
+  {
     "id": "NO YEYE NO TEA08",
     "categoryId": "NO YEYE NO TEA",
     "order": 80,
     "name": "咸宁桂花",
     "desc": "咸宁，桂花之乡。首配洞庭碧螺春茶，融合牧场牛奶丝滑口感，敢问茶友千年古桂城结的桂花是什么味道?",
     "price": "0",
-    "image": "../../assets/placeholder-food.jpg",
+    "image": "../../assets/foods/MilkTea03.jpg",
     "tags": [
       "桂花之乡",
       "清雅桂香"
@@ -1092,7 +1859,8 @@ export default [
     "image": "../../assets/foods/grape.jpg",
     "tags": [
       "夏秋",
-      "平性"
+      "平性",
+      "不易上火"
     ],
     "options": []
   },
@@ -1154,13 +1922,58 @@ export default [
     ]
   },
   {
+    "id": "MOLLY TEA09",
+    "categoryId": "MOLLY TEA",
+    "order": 90,
+    "name": "抹茶针王",
+    "desc": "甄选抹茶粉及安佳奶油，现调抹茶芝士绵密柔滑。含:抹茶芝士+茉莉针王+牛奶。",
+    "price": "0",
+    "image": "../../assets/foods/MollyTea01.jpg",
+    "tags": [
+      "全新升级"
+    ],
+    "options": [
+      {
+        "id": "杯型",
+        "name": "杯型",
+        "required": true,
+        "choices": [
+          "中杯"
+        ]
+      },
+      {
+        "id": "温度",
+        "name": "温度",
+        "required": true,
+        "choices": [
+          "正常冰",
+          "少冰（推荐）",
+          "去冰",
+          "热饮"
+        ]
+      },
+      {
+        "id": "甜度",
+        "name": "甜度",
+        "required": true,
+        "choices": [
+          "正常糖",
+          "七分糖（推荐）",
+          "五分糖",
+          "三分糖",
+          "不另外加糖"
+        ]
+      }
+    ]
+  },
+  {
     "id": "NO YEYE NO TEA09",
     "categoryId": "NO YEYE NO TEA",
     "order": 90,
     "name": "红苹果",
     "desc": "七音茉莉绿茶遇见精选红富士苹果汁，花香茶香果香自然细密交融，搭配醇厚牛奶，顺滑入喉。",
     "price": "0",
-    "image": "../../assets/placeholder-food.jpg",
+    "image": "../../assets/foods/MilkTea03.jpg",
     "tags": [
       "浓郁果香"
     ],
@@ -1207,7 +2020,8 @@ export default [
     "image": "../../assets/foods/dragon_fruit.jpg",
     "tags": [
       "夏秋",
-      "偏凉"
+      "偏凉",
+      "下火"
     ],
     "options": []
   },
@@ -1256,6 +2070,53 @@ export default [
     ]
   },
   {
+    "id": "MOLLY TEA10",
+    "categoryId": "MOLLY TEA",
+    "order": 100,
+    "name": "茉莉针王",
+    "desc": "中国茶叶流通协会认证金奖茉莉茶底!采用等级更高的茉莉针王为茶底，含:茉莉针王+牛奶",
+    "price": "0",
+    "image": "../../assets/foods/MollyTea01.jpg",
+    "tags": [
+      "金奖茉莉",
+      "可做热饮"
+    ],
+    "options": [
+      {
+        "id": "杯型",
+        "name": "杯型",
+        "required": true,
+        "choices": [
+          "大杯",
+          "中杯"
+        ]
+      },
+      {
+        "id": "温度",
+        "name": "温度",
+        "required": true,
+        "choices": [
+          "正常冰",
+          "少冰（推荐）",
+          "去冰（8分满）",
+          "热饮"
+        ]
+      },
+      {
+        "id": "甜度",
+        "name": "甜度",
+        "required": true,
+        "choices": [
+          "正常糖",
+          "七分糖（推荐）",
+          "五分糖",
+          "三分糖",
+          "不另外加糖"
+        ]
+      }
+    ]
+  },
+  {
     "id": "fruit10",
     "categoryId": "fruit",
     "order": 100,
@@ -1265,9 +2126,54 @@ export default [
     "image": "../../assets/foods/orange.jpg",
     "tags": [
       "秋冬",
-      "偏凉"
+      "偏凉",
+      "下火"
     ],
     "options": []
+  },
+  {
+    "id": "MOLLY TEA11",
+    "categoryId": "MOLLY TEA",
+    "order": 110,
+    "name": "针王冰茶",
+    "desc": "高等级的茉莉针王，前调茉莉花香，中调嫩香毫香显露，尾调冰糖感微甜。含:茉莉针王。",
+    "price": "0",
+    "image": "../../assets/foods/MollyTea01.jpg",
+    "tags": [
+      "纯茶生香"
+    ],
+    "options": [
+      {
+        "id": "杯型",
+        "name": "杯型",
+        "required": true,
+        "choices": [
+          "中杯"
+        ]
+      },
+      {
+        "id": "温度",
+        "name": "温度",
+        "required": true,
+        "choices": [
+          "正常冰（推荐）",
+          "少冰",
+          "去冰"
+        ]
+      },
+      {
+        "id": "甜度",
+        "name": "甜度",
+        "required": true,
+        "choices": [
+          "正常糖",
+          "七分糖（推荐）",
+          "五分糖",
+          "三分糖",
+          "不另外加糖"
+        ]
+      }
+    ]
   },
   {
     "id": "fruit12",
@@ -1277,7 +2183,99 @@ export default [
     "desc": "",
     "price": "0",
     "image": "../../assets/foods/pineapple.jpg",
-    "tags": [],
+    "tags": [
+      "春夏",
+      "平性",
+      "不易上火"
+    ],
     "options": []
+  },
+  {
+    "id": "MOLLY TEA12",
+    "categoryId": "MOLLY TEA",
+    "order": 120,
+    "name": "茉莉椰冰茶",
+    "desc": "采用高等级的茉莉针王，搭配泰国香椰水，含:茉莉针王+香椰水。",
+    "price": "0",
+    "image": "../../assets/foods/MollyTea01.jpg",
+    "tags": [
+      "纯茶生香"
+    ],
+    "options": [
+      {
+        "id": "杯型",
+        "name": "杯型",
+        "required": true,
+        "choices": [
+          "中杯"
+        ]
+      },
+      {
+        "id": "温度",
+        "name": "温度",
+        "required": true,
+        "choices": [
+          "正常冰（推荐）",
+          "少冰",
+          "去冰"
+        ]
+      },
+      {
+        "id": "甜度",
+        "name": "甜度",
+        "required": true,
+        "choices": [
+          "正常糖",
+          "七分糖（推荐）",
+          "五分糖",
+          "三分糖",
+          "不另外加糖"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "MOLLY TEA13",
+    "categoryId": "MOLLY TEA",
+    "order": 130,
+    "name": "栀子冰茶",
+    "desc": "栀子系列茶底新升级，五斤栀子窨一斤茶，五倍香入茶。尾调干净鲜灵。含:栀香绿茶。",
+    "price": "0",
+    "image": "../../assets/foods/MollyTea01.jpg",
+    "tags": [
+      "纯茶生香"
+    ],
+    "options": [
+      {
+        "id": "杯型",
+        "name": "杯型",
+        "required": true,
+        "choices": [
+          "中杯"
+        ]
+      },
+      {
+        "id": "温度",
+        "name": "温度",
+        "required": true,
+        "choices": [
+          "正常冰",
+          "少冰（推荐）",
+          "去冰（9分满）"
+        ]
+      },
+      {
+        "id": "甜度",
+        "name": "甜度",
+        "required": true,
+        "choices": [
+          "正常糖",
+          "七分糖（推荐）",
+          "五分糖",
+          "三分糖",
+          "不另外加糖"
+        ]
+      }
+    ]
   }
 ]

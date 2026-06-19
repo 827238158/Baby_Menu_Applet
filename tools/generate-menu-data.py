@@ -1,7 +1,7 @@
 import json
 import re
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 try:
     from openpyxl import load_workbook
@@ -45,12 +45,15 @@ def normalize_number(value):
             return 0
 
 
-def image_path(image_file):
+def image_path(image_file, dish=None):
     value = normalize_text(image_file)
     if not value:
         return PLACEHOLDER_IMAGE
-    if value.startswith('../') or value.startswith('..\\') or '/' in value or '\\' in value:
-        return value.replace('\\', '/')
+
+    if value != PurePosixPath(value).name or value != PureWindowsPath(value).name:
+        row_label = f' 第{dish["__line"]}行' if dish else ''
+        raise MenuDataError(f'Dishes{row_label} imageFile 只允许填写文件名，不能包含路径：{value}')
+
     return FOOD_IMAGE_PREFIX + value
 
 
@@ -260,7 +263,7 @@ def build_dishes(workbook, categories):
             'name': dish['dishName'],
             'desc': dish['desc'],
             'price': dish['price'] or '0',
-            'image': image_path(dish['imageFile']),
+            'image': image_path(dish['imageFile'], dish),
             'tags': parse_tags(dish.get('tags', '')),
             'options': parse_options(dish.get('options', ''), dish),
         }
