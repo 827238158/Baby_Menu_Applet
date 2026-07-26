@@ -2,6 +2,35 @@
 
 本项目是微信原生小程序菜单展示页，定位是“可发布展示版 / 可预览展示版”，不是完整点单系统。
 
+## 沟通规则
+
+- 默认使用中文交流，并称呼用户为“小主”。
+- 回答要清晰、直接，不要过度正式。
+- 不确定的结论必须明确说明“不确定”或“需要验证”。
+- 不要编造文件路径、命令输出、软件版本、接口返回结果或项目结构。
+- 代码生成时关键步骤加中文注释。
+- 遇到风险操作时，先说明风险，再给出建议。
+
+## 每次任务的读取规则
+
+未来 Agent 开始任务前，先输出 `Need:` 列表，说明本次需要读取哪些记忆或源码。
+
+默认读取集：
+
+```text
+AGENTS.md
+memory/MEMORY.md
+memory/CURRENT.md
+```
+
+按任务追加读取：
+
+- UI、布局、视觉、组件：读 `DESIGN.md`。
+- 启动、生成、检查、构建、预览：读 `memory/RUNBOOK.md`。
+- 编码、环境、Excel、图片、微信小程序限制等反复踩坑：读 `memory/PITFALLS.md`。
+- 菜单维护细节：读 `CUSTOMIZATION.md`，再按需检查 `tools/menu-workbook/menu-data.xlsx` 和生成脚本。
+- 实现影响面：用 `rg` 搜索代码中的符号、页面、样式、调用方和测试；文档只提供意图和边界，代码搜索决定真实影响面。
+
 ## 项目边界
 
 - 不接后端、数据库、登录、支付或真实订单。
@@ -9,6 +38,8 @@
 - 用户最终操作是复制已选菜单文本。
 - 除非用户明确要求，不要新增真实下单、云开发、后端接口、支付流程或 npm 构建流程。
 - `project.config.json` 里的 `touristappid` 不要主动替换。
+- 当前项目不做真实交易，现有商品 `price` 统一保持字符串 `'0'`。
+- 规格选项暂时不影响价格，不要增加规格加价逻辑，除非用户明确要求。
 
 ## 技术栈
 
@@ -33,62 +64,29 @@ miniprogram/pages/menu/menu.wxss
 miniprogram/assets/
 CUSTOMIZATION.md
 README.md
+DESIGN.md
+memory/
 ```
 
 ## 菜单数据维护
 
-日常不需要手改 `tools/menu-workbook/menu-data.xlsx`，不要手改生成后的 `miniprogram/data/*.js`，除非用户明确需求。
-
-工作簿当前只保留这些 Sheet：
-
-- `Shop`：店铺名、分享标题、分享图、页面背景图、顶部背景图。
-- `Categories`：分类 ID、分类名称、排序。
-- `Dishes`：商品主表，包含商品、分类、描述、价格、图片、标签、规格。
-
-`Dishes.tags` 用自然文本维护，例如：
-
-```text
-招牌、推荐
-```
-
-`Dishes.options` 一行一个规格组，例如：
-
-```text
-糖度: 七分糖、五分糖
-小料(可选): 珍珠、椰果
-```
-
-修改 Excel 后运行：
-
-```powershell
-node tools\generate-menu-data.js
-```
-
-`generate-menu-data.js` 是日常入口，负责寻找可用 Python；`generate-menu-data.py` 负责读取 Excel 并生成：
-
-- `miniprogram/data/shop-data.js`
-- `miniprogram/data/category-data.js`
-- `miniprogram/data/dish-data.js`
-
-`menu-data.js` 只做聚合和排序，通常不要改。
-
-## 图片与价格
-
+- 日常不需要手改 `tools/menu-workbook/menu-data.xlsx`，不要手改生成后的 `miniprogram/data/*.js`，除非用户明确需求。
+- 工作簿当前只保留 `Shop`、`Categories`、`Dishes` 三类 Sheet。
 - 商品图片放在 `miniprogram/assets/foods/`。
 - `Dishes.imageFile` 只填文件名，例如 `mango.jpg`；留空会使用占位图。
 - 不要把 Windows 绝对路径写进图片配置。
-- 当前项目不做真实交易，现有商品 `price` 统一保持字符串 `'0'`。
-- 规格选项暂时不影响价格，不要增加规格加价逻辑，除非用户明确要求。
+- 修改 Excel 后运行 `node tools\generate-menu-data.js`。
+- `generate-menu-data.js` 是日常入口，负责寻找可用 Python；`generate-menu-data.py` 负责读取 Excel 并生成数据文件。
+- `menu-data.js` 只做聚合和排序，通常不要改。
 
-## UI 与交互原则
+## 记忆更新规则
 
-- 商品列表保持手机端卡片布局，图片固定尺寸并使用 `aspectFill`。
-- 商品名称、价格、标签、描述、规格提示和购物车控件不能重叠。
-- 商品卡片加购入口统一使用圆形 `+`。
-- 有规格商品点击 `+` 打开底部规格面板，默认选中每组第一项。
-- 无规格商品点击 `+` 直接加入购物车。
-- 同一商品不同规格组合作为不同购物车项。
-- 不要新增显式分享按钮、订单状态、订单编号、支付状态或提交订单接口，除非用户明确要求。
+- 稳定项目事实和读取路由：更新 `memory/MEMORY.md`。
+- 当前任务状态、验收、进度、阻塞和下一步：更新 `memory/CURRENT.md`；执行中完成关键步骤、发现阻塞、改变方案或扩大影响面时及时补充。
+- 重要长期变更、迁移、发布、恢复事件：更新 `memory/LOG.md`；普通过程进度不要写入 `LOG.md`。
+- 常见坑的触发、原因、恢复方式：更新 `memory/PITFALLS.md`。
+- 启动、生成、检查、构建、预览命令：更新 `memory/RUNBOOK.md`。
+- UI 和交互规则：更新 `DESIGN.md`，不要重复写进 README 或记忆文件。
 
 ## 常用检查
 
@@ -108,6 +106,3 @@ git diff --check
 ## 编码注意
 
 项目包含中文。PowerShell 终端偶尔会把中文显示成乱码，不要仅凭终端显示判断文件损坏。检查 JS 语法时优先让 Node 直接读取文件路径，避免用管道传中文文件内容。
-
-## 沟通偏好
- - 无论何时，都需要确认后再答复用户。

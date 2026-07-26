@@ -1,0 +1,31 @@
+{
+  "description": "Ensure project-changing Codex turns also update memory/CURRENT.md.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/current-memory-guard.cjs\"",
+            "commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& ((git rev-parse --show-toplevel) + '/.codex/hooks/invoke-current-memory-guard.ps1')\"",
+            "timeout": 30,
+            "statusMessage": "Recording CURRENT.md baseline"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/current-memory-guard.cjs\"",
+            "commandWindows": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"& ((git rev-parse --show-toplevel) + '/.codex/hooks/invoke-current-memory-guard.ps1')\"",
+            "timeout": 30,
+            "statusMessage": "Checking CURRENT.md update"
+          }
+        ]
+      }
+    ]
+  }
+}
