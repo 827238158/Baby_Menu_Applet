@@ -1,6 +1,7 @@
 {
   "pages": [
-    "pages/menu/menu"
+    "pages/menu/menu",
+    "pages/gifts/gifts"
   ],
   "window": {
     "navigationBarTitleText": "宝宝菜单",

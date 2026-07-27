@@ -175,6 +175,12 @@ Page({
     }
   },
 
+  openGiftFolder() {
+    wx.navigateTo({
+      url: '/pages/gifts/gifts'
+    })
+  },
+
   switchCategory(event) {
     const categoryId = event.currentTarget.dataset.id
     const category = this.data.categories.find((item) => item.id === categoryId)

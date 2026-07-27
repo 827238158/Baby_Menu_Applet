@@ -60,6 +60,73 @@ button::after {
   gap: 12rpx;
 }
 
+.gift-folder-entry {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8rpx;
+  box-sizing: border-box;
+  min-height: 58rpx;
+  padding: 0 16rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.56);
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  line-height: 56rpx;
+  color: #ffffff;
+  background: rgba(34, 31, 30, 0.24);
+  transition: transform 160ms ease, background-color 160ms ease;
+}
+
+.gift-folder-entry:active {
+  transform: scale(0.96);
+  background: rgba(34, 31, 30, 0.34);
+}
+
+.gift-entry-icon {
+  position: relative;
+  flex: 0 0 auto;
+  width: 30rpx;
+  height: 30rpx;
+}
+
+.gift-entry-lid,
+.gift-entry-box,
+.gift-entry-ribbon {
+  position: absolute;
+  box-sizing: border-box;
+}
+
+.gift-entry-lid {
+  top: 5rpx;
+  left: 2rpx;
+  width: 26rpx;
+  height: 8rpx;
+  border: 3rpx solid #ffffff;
+  border-radius: 3rpx;
+}
+
+.gift-entry-box {
+  top: 13rpx;
+  left: 4rpx;
+  width: 22rpx;
+  height: 14rpx;
+  border: 3rpx solid #ffffff;
+  border-top: 0;
+  border-radius: 0 0 4rpx 4rpx;
+}
+
+.gift-entry-ribbon {
+  top: 3rpx;
+  left: 13rpx;
+  width: 4rpx;
+  height: 24rpx;
+  border-radius: 2rpx;
+  background: #ffffff;
+}
+
 .shop-kicker {
   align-self: flex-start;
   padding: 8rpx 14rpx;
@@ -1109,6 +1176,19 @@ button::after {
   .shop-header,
   .dish-card {
     border-radius: 14rpx;
+  }
+
+  .shop-header {
+    gap: 14rpx;
+    padding-right: 24rpx;
+    padding-left: 24rpx;
+  }
+
+  .gift-folder-entry {
+    min-height: 52rpx;
+    padding: 0 12rpx;
+    font-size: 20rpx;
+    line-height: 50rpx;
   }
 
   .dish-image {

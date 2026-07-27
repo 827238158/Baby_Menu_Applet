@@ -4,3 +4,14 @@ tools/__pycache__/
 miniprogram/assets.lnk
 截图*.png
 *.tmp.png
+
+# Local Agent/Codex workspace files
+.codex/
+memory/
+AGENTS.md
+
+# WeChat DevTools local private config
+project.private.config.json
+
+# Local menu workbook source
+tools/menu-workbook/menu-data.xlsx
