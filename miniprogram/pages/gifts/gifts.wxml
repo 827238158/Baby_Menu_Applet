@@ -115,6 +115,7 @@
             <input
               class="form-input"
               value="{{form.name}}"
+              disabled="{{isSaving || isDeleting}}"
               placeholder="例如：手工陶瓷杯"
               placeholder-class="form-placeholder"
               maxlength="40"
@@ -131,6 +132,7 @@
             <textarea
               class="form-textarea"
               value="{{form.description}}"
+              disabled="{{isSaving || isDeleting}}"
               placeholder="记录款式、颜色或喜欢它的原因"
               placeholder-class="form-placeholder"
               maxlength="200"
@@ -142,7 +144,14 @@
       </scroll-view>
 
       <view class="form-footer">
-        <button wx:if="{{isEditing}}" class="delete-button" bindtap="confirmDelete">删除</button>
+        <button
+          wx:if="{{isEditing}}"
+          class="delete-button"
+          disabled="{{isSaving || isDeleting}}"
+          bindtap="confirmDelete"
+        >
+          删除
+        </button>
         <button
           class="save-button {{saveDisabled ? 'save-button-disabled' : ''}}"
           disabled="{{saveDisabled}}"

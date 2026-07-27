@@ -4,6 +4,9 @@ tools/__pycache__/
 miniprogram/assets.lnk
 截图*.png
 *.tmp.png
+serverless/gift-api/node_modules/
+serverless/gift-api/*.zip
+serverless/gift-api/.env
 
 # Local Agent/Codex workspace files
 .codex/
