@@ -1,0 +1,156 @@
+<view class="page" style="{{pageStyle}}">
+  <view class="gift-header">
+    <image
+      wx:if="{{shop.headerBackgroundImage}}"
+      class="gift-header-bg"
+      src="{{shop.headerBackgroundImage}}"
+      mode="aspectFill"
+    ></image>
+    <view class="gift-header-overlay"></view>
+    <view class="gift-header-copy">
+      <text class="gift-header-title">我的礼品夹</text>
+      <text class="gift-header-subtitle">已收藏 {{giftCount}} 件心仪礼品</text>
+    </view>
+  </view>
+
+  <view wx:if="{{gifts.length}}" class="gift-list">
+    <view class="gift-card" wx:for="{{gifts}}" wx:key="id">
+      <view
+        wx:if="{{item.imagePath && item.imageAvailable}}"
+        class="gift-image-wrap"
+        data-src="{{item.imagePath}}"
+        bindtap="previewImage"
+      >
+        <image
+          class="gift-image"
+          src="{{item.imagePath}}"
+          mode="aspectFill"
+          data-id="{{item.id}}"
+          binderror="handleImageError"
+        ></image>
+      </view>
+      <view wx:else class="gift-image-wrap gift-placeholder" aria-hidden="true">
+        <view class="placeholder-gift">
+          <view class="placeholder-lid"></view>
+          <view class="placeholder-box"></view>
+          <view class="placeholder-ribbon"></view>
+        </view>
+      </view>
+
+      <view class="gift-info" data-id="{{item.id}}" bindtap="openEditForm">
+        <view class="gift-title-row">
+          <text class="gift-name">{{item.displayName}}</text>
+          <text class="gift-date">{{item.dateText}}</text>
+        </view>
+        <text wx:if="{{item.description}}" class="gift-description">{{item.description}}</text>
+        <view class="gift-edit-hint">
+          <text>查看与编辑</text>
+          <text class="gift-edit-arrow">›</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:else class="empty-state">
+    <view class="empty-gift-icon" aria-hidden="true">
+      <view class="empty-gift-lid"></view>
+      <view class="empty-gift-box"></view>
+      <view class="empty-gift-ribbon"></view>
+    </view>
+    <text class="empty-title">还没有收藏礼品</text>
+    <button class="empty-add-button" bindtap="openCreateForm">收藏第一件</button>
+  </view>
+
+  <button
+    wx:if="{{gifts.length}}"
+    class="floating-add-button"
+    bindtap="openCreateForm"
+    aria-label="收藏新礼品"
+  >
+    <text class="floating-add-icon">+</text>
+  </button>
+
+  <view wx:if="{{formVisible}}" class="form-mask" catchtouchmove="stopTap">
+    <view class="form-panel" style="{{formSheetStyle}}" catchtap="stopTap" catchtouchmove="stopTap">
+      <view
+        class="form-drag-zone"
+        bindtouchstart="handleFormDragStart"
+        bindtouchmove="handleFormDragMove"
+        bindtouchend="handleFormDragEnd"
+        bindtouchcancel="handleFormDragEnd"
+      >
+        <view class="sheet-drag-area">
+          <view class="sheet-drag-handle"></view>
+        </view>
+        <view class="form-header">
+          <text class="form-title">{{formTitle}}</text>
+        </view>
+      </view>
+
+      <scroll-view class="form-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+        <view class="form-content">
+          <view class="image-picker" bindtap="chooseImage">
+            <image
+              wx:if="{{form.imagePath}}"
+              class="image-picker-preview"
+              src="{{form.imagePath}}"
+              mode="aspectFill"
+            ></image>
+            <view wx:else class="image-picker-empty">
+              <text class="image-picker-plus">+</text>
+              <text class="image-picker-label">从相册选择图片</text>
+              <text class="image-picker-optional">选填</text>
+            </view>
+            <view wx:if="{{form.imagePath}}" class="image-picker-actions">
+              <text class="image-change-label">更换图片</text>
+              <button class="image-remove-button" catchtap="removeFormImage">移除</button>
+            </view>
+          </view>
+
+          <view class="form-field">
+            <view class="field-label-row">
+              <text class="field-label">礼品名称</text>
+              <text class="field-optional">选填</text>
+            </view>
+            <input
+              class="form-input"
+              value="{{form.name}}"
+              placeholder="例如：手工陶瓷杯"
+              placeholder-class="form-placeholder"
+              maxlength="40"
+              confirm-type="next"
+              bindinput="handleNameInput"
+            />
+          </view>
+
+          <view class="form-field">
+            <view class="field-label-row">
+              <text class="field-label">简介</text>
+              <text class="field-optional">选填</text>
+            </view>
+            <textarea
+              class="form-textarea"
+              value="{{form.description}}"
+              placeholder="记录款式、颜色或喜欢它的原因"
+              placeholder-class="form-placeholder"
+              maxlength="200"
+              auto-height
+              bindinput="handleDescriptionInput"
+            ></textarea>
+          </view>
+        </view>
+      </scroll-view>
+
+      <view class="form-footer">
+        <button wx:if="{{isEditing}}" class="delete-button" bindtap="confirmDelete">删除</button>
+        <button
+          class="save-button {{saveDisabled ? 'save-button-disabled' : ''}}"
+          disabled="{{saveDisabled}}"
+          bindtap="saveGift"
+        >
+          保存到礼品夹
+        </button>
+      </view>
+    </view>
+  </view>
+</view>
