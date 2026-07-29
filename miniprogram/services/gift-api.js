@@ -243,7 +243,7 @@ function createGiftApi(wxApi, config = giftCloudConfig) {
     })
   }
 
-  async function uploadImage(filePath, giftId) {
+  async function uploadImage(filePath, giftId, asset = 'image') {
     const file = await getFileInfo(filePath)
 
     if (!file.size || file.size > 8 * 1024 * 1024) {
@@ -256,7 +256,8 @@ function createGiftApi(wxApi, config = giftCloudConfig) {
       data: {
         giftId,
         contentType: file.contentType,
-        size: file.size
+        size: file.size,
+        asset
       }
     })
     const fileData = await readFile(filePath)
@@ -268,8 +269,10 @@ function createGiftApi(wxApi, config = giftCloudConfig) {
   return {
     clearSession,
     isConfigured,
-    listGifts() {
-      return authorizedRequest({ path: '/gifts' })
+    listGifts(cursor = '', limit = 20) {
+      const query = '?limit=' + encodeURIComponent(limit) +
+        (cursor ? '&cursor=' + encodeURIComponent(cursor) : '')
+      return authorizedRequest({ path: '/gifts' + query })
     },
     createGift(gift) {
       return authorizedRequest({
@@ -291,6 +294,9 @@ function createGiftApi(wxApi, config = giftCloudConfig) {
         method: 'DELETE'
       })
     },
+    getGiftImage(id) {
+      return authorizedRequest({ path: '/gifts/' + encodeURIComponent(id) + '/image' })
+    },
     deleteOrphan(imageKey) {
       return authorizedRequest({
         path: '/uploads/orphan',
@@ -298,7 +304,21 @@ function createGiftApi(wxApi, config = giftCloudConfig) {
         data: { imageKey }
       })
     },
-    uploadImage
+    uploadImage,
+    async uploadImages(originalPath, thumbnailPath, giftId) {
+      const imageKey = await uploadImage(originalPath, giftId, 'image')
+      try {
+        const thumbnailKey = await uploadImage(thumbnailPath, giftId, 'thumbnail')
+        return { imageKey, thumbnailKey }
+      } catch (error) {
+        authorizedRequest({
+          path: '/uploads/orphan',
+          method: 'DELETE',
+          data: { imageKey }
+        }).catch(() => {})
+        throw error
+      }
+    }
   }
 }
 

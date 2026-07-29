@@ -8,6 +8,7 @@ function createEmptyForm() {
     id: '',
     imagePath: '',
     imageKey: '',
+    thumbnailKey: '',
     name: '',
     description: ''
   }
@@ -45,7 +46,8 @@ function normalizeGift(gift) {
     return null
   }
 
-  const imageUrl = typeof gift.imageUrl === 'string' ? gift.imageUrl : ''
+  const imageUrl = typeof gift.thumbnailUrl === 'string' ? gift.thumbnailUrl :
+    typeof gift.imageUrl === 'string' ? gift.imageUrl : ''
   const imagePath = imageUrl
     ? imageUrl
     : typeof gift.imagePath === 'string' ? gift.imagePath : ''
@@ -64,6 +66,7 @@ function normalizeGift(gift) {
     imagePath,
     imageUrl,
     imageKey,
+    thumbnailKey: typeof gift.thumbnailKey === 'string' ? gift.thumbnailKey : '',
     name,
     description,
     createdAt,
@@ -95,19 +98,12 @@ function serializeGifts(gifts) {
     imagePath: gift.imagePath || '',
     imageUrl: gift.imageUrl || '',
     imageKey: gift.imageKey || '',
+    thumbnailKey: gift.thumbnailKey || '',
     name: gift.name || '',
     description: gift.description || '',
     createdAt: gift.createdAt,
     updatedAt: gift.updatedAt
   }))
-}
-
-function formsEqual(left, right) {
-  return left.id === right.id &&
-    left.imagePath === right.imagePath &&
-    left.imageKey === right.imageKey &&
-    left.name === right.name &&
-    left.description === right.description
 }
 
 Page({
@@ -116,7 +112,9 @@ Page({
     pageStyle: getPageStyle(menuData.shop),
     gifts: [],
     giftCount: 0,
+    accessDenied: false,
     formVisible: false,
+    formClosing: false,
     isEditing: false,
     formTitle: '收藏新礼品',
     form: createEmptyForm(),
@@ -124,13 +122,20 @@ Page({
     isSaving: false,
     isDeleting: false,
     formSheetStyle: '',
-    formDragStartY: 0
+    formDragStartY: 0,
+    hasMore: true,
+    nextCursor: '',
+    isLoadingMore: false,
+    isPreviewVisible: false,
+    previewImagePath: '',
+    isPreviewLoading: false
   },
 
   onLoad() {
-    this.initialForm = createEmptyForm()
     this.pendingImagePath = ''
+    this.pendingThumbnailPath = ''
     this.accessDenied = false
+    this.closeTimer = null
 
     if (!giftApi.isConfigured()) {
       wx.showToast({
@@ -145,10 +150,16 @@ Page({
   },
 
   onUnload() {
+    if (this.closeTimer) {
+      clearTimeout(this.closeTimer)
+    }
     this.cleanupPendingImage()
   },
 
   loadGifts() {
+    if (this.accessDenied) {
+      return
+    }
     let gifts = []
 
     try {
@@ -160,27 +171,59 @@ Page({
       })
     }
 
-    this.setData({
-      gifts,
-      giftCount: gifts.length
-    })
+    this.cachedGifts = gifts
 
     if (giftApi.isConfigured()) {
-      this.refreshCloudGifts()
+      // 先完成云端白名单校验，避免未授权账号短暂看到本地缓存内容。
+      this.setData({
+        gifts: [],
+        giftCount: 0,
+        hasMore: true,
+        nextCursor: ''
+      })
+      this.refreshCloudGifts(true)
+      return
     }
+
+    this.setData({
+      gifts,
+      giftCount: gifts.length,
+      hasMore: false,
+      nextCursor: ''
+    })
   },
 
-  async refreshCloudGifts() {
+  async refreshCloudGifts(reset = false) {
+    if (this.data.isLoadingMore) return
+    this.setData({ isLoadingMore: true })
     try {
-      const cloudGifts = await giftApi.listGifts()
-      const gifts = normalizeGifts(cloudGifts)
+      const result = await giftApi.listGifts(reset ? '' : this.data.nextCursor, 20)
+      const cloudGifts = Array.isArray(result) ? result : result.items || []
+      const gifts = normalizeGifts(reset ? cloudGifts : this.data.gifts.concat(cloudGifts))
 
       this.persistGifts(gifts)
       this.setData({
         gifts,
-        giftCount: gifts.length
+        giftCount: Number(result && result.total) || gifts.length,
+        hasMore: Boolean(result && result.hasMore),
+        nextCursor: result && result.nextCursor || '',
+        isLoadingMore: false
       })
+      this.hasLoaded = true
     } catch (error) {
+      this.setData({ isLoadingMore: false })
+      if (error && error.code === 'FORBIDDEN') {
+        this.handleCloudError(error, '云端同步失败，已显示缓存')
+        return
+      }
+      if (!this.accessDenied && reset && this.cachedGifts) {
+        this.setData({
+          gifts: this.cachedGifts,
+          giftCount: this.cachedGifts.length,
+          hasMore: false,
+          nextCursor: ''
+        })
+      }
       this.handleCloudError(error, '云端同步失败，已显示缓存')
     }
   },
@@ -192,14 +235,15 @@ Page({
       }
 
       this.accessDenied = true
-      wx.showModal({
-        title: '无法访问礼品夹',
-        content: '当前微信账号不在授权名单中。',
-        showCancel: false,
-        confirmText: '知道了',
-        success: () => {
-          wx.navigateBack({ delta: 1 })
-        }
+      this.setData({
+        accessDenied: true,
+        gifts: [],
+        giftCount: 0,
+        hasMore: false,
+        nextCursor: '',
+        isLoadingMore: false,
+        formVisible: false,
+        formClosing: false
       })
       return
     }
@@ -211,12 +255,14 @@ Page({
   },
 
   openCreateForm() {
+    if (this.accessDenied) return
     const form = createEmptyForm()
 
-    this.initialForm = Object.assign({}, form)
     this.pendingImagePath = ''
+    this.pendingThumbnailPath = ''
     this.setData({
       formVisible: true,
+      formClosing: false,
       isEditing: false,
       formTitle: '收藏新礼品',
       form,
@@ -229,6 +275,7 @@ Page({
   },
 
   openEditForm(event) {
+    if (this.accessDenied) return
     const id = event.currentTarget.dataset.id
     const gift = this.data.gifts.find((item) => item.id === id)
 
@@ -240,14 +287,16 @@ Page({
       id: gift.id,
       imagePath: gift.imagePath,
       imageKey: gift.imageKey,
+      thumbnailKey: gift.thumbnailKey,
       name: gift.name,
       description: gift.description
     }
 
-    this.initialForm = Object.assign({}, form)
     this.pendingImagePath = ''
+    this.pendingThumbnailPath = ''
     this.setData({
       formVisible: true,
+      formClosing: false,
       isEditing: true,
       formTitle: '编辑礼品',
       form,
@@ -260,41 +309,34 @@ Page({
   },
 
   requestCloseForm() {
-    if (this.data.isSaving || this.data.isDeleting) {
+    if (this.data.isSaving || this.data.isDeleting || this.data.formClosing) {
       return
     }
 
-    if (!this.hasFormChanges()) {
-      this.discardForm()
-      return
-    }
-
-    wx.showModal({
-      title: '放弃本次修改？',
-      content: '关闭后，本次填写的内容不会保存。',
-      confirmText: '放弃',
-      confirmColor: '#c45f72',
-      cancelText: '继续填写',
-      success: (result) => {
-        if (result.confirm) {
-          this.discardForm()
-        }
-      }
-    })
+    this.startCloseAnimation()
   },
 
-  discardForm() {
-    this.cleanupPendingImage()
-    this.hideForm()
+  startCloseAnimation() {
+    if (this.data.formClosing) return
+
+    this.setData({
+      formClosing: true,
+      formSheetStyle: 'transform: translateY(100%); transition: transform 220ms ease-in;'
+    })
+    this.closeTimer = setTimeout(() => this.hideForm(), 230)
   },
 
   hideForm() {
     const form = createEmptyForm()
 
-    this.initialForm = Object.assign({}, form)
-    this.pendingImagePath = ''
+    if (this.closeTimer) {
+      clearTimeout(this.closeTimer)
+      this.closeTimer = null
+    }
+    this.cleanupPendingImage()
     this.setData({
       formVisible: false,
+      formClosing: false,
       isEditing: false,
       formTitle: '收藏新礼品',
       form,
@@ -355,10 +397,6 @@ Page({
     }
   },
 
-  hasFormChanges() {
-    return !formsEqual(this.data.form, this.initialForm || createEmptyForm())
-  },
-
   hasFormContent(form) {
     return Boolean(
       form.imagePath ||
@@ -374,11 +412,12 @@ Page({
     })
   },
 
-  chooseImage() {
+  chooseImage(event) {
     if (this.data.isSaving || this.data.isDeleting) {
       return
     }
 
+    const sourceType = event && event.currentTarget.dataset.source || 'album'
     const handleSuccess = (tempFilePath) => {
       if (tempFilePath) {
         this.saveSelectedImage(tempFilePath)
@@ -389,8 +428,8 @@ Page({
       wx.chooseMedia({
         count: 1,
         mediaType: ['image'],
-        sourceType: ['album'],
-        sizeType: ['compressed'],
+        sourceType: [sourceType],
+        sizeType: ['original'],
         success: (result) => {
           const selectedFile = result.tempFiles && result.tempFiles[0]
           handleSuccess(selectedFile && selectedFile.tempFilePath)
@@ -401,8 +440,8 @@ Page({
 
     wx.chooseImage({
       count: 1,
-      sourceType: ['album'],
-      sizeType: ['compressed'],
+      sourceType: [sourceType],
+      sizeType: ['original'],
       success: (result) => {
         handleSuccess(result.tempFilePaths && result.tempFilePaths[0])
       }
@@ -417,11 +456,12 @@ Page({
       tempFilePath,
       success: (result) => {
         this.cleanupPendingImage()
-        this.pendingImagePath = result.savedFilePath
-        this.setData({
-          'form.imagePath': result.savedFilePath
+        this.createThumbnail(result.savedFilePath, (thumbnailPath) => {
+          this.pendingImagePath = result.savedFilePath
+          this.pendingThumbnailPath = thumbnailPath
+          this.setData({ 'form.imagePath': result.savedFilePath })
+          this.updateSaveState()
         })
-        this.updateSaveState()
       },
       fail: () => {
         wx.showToast({
@@ -429,6 +469,21 @@ Page({
           icon: 'none'
         })
       }
+    })
+  },
+
+  createThumbnail(filePath, success) {
+    // 原图只供全屏查看，列表使用微信原生压缩后的缩略图降低下行流量。
+    if (!wx.compressImage) {
+      success(filePath)
+      return
+    }
+
+    wx.compressImage({
+      src: filePath,
+      quality: 65,
+      success: (result) => success(result.tempFilePath || filePath),
+      fail: () => success(filePath)
     })
   },
 
@@ -443,13 +498,14 @@ Page({
 
     this.setData({
       'form.imagePath': '',
-      'form.imageKey': ''
+      'form.imageKey': '',
+      'form.thumbnailKey': ''
     })
     this.updateSaveState()
   },
 
   handleNameInput(event) {
-    if (this.data.isSaving || this.data.isDeleting) {
+    if (this.data.isSaving || this.data.isDeleting || this.data.formClosing) {
       return
     }
 
@@ -460,7 +516,7 @@ Page({
   },
 
   handleDescriptionInput(event) {
-    if (this.data.isSaving || this.data.isDeleting) {
+    if (this.data.isSaving || this.data.isDeleting || this.data.formClosing) {
       return
     }
 
@@ -471,11 +527,10 @@ Page({
   },
 
   async saveGift() {
-    const form = Object.assign({}, this.data.form)
-
-    if (this.data.isSaving || this.data.isDeleting) {
+    if (this.data.isSaving || this.data.isDeleting || this.accessDenied) {
       return
     }
+    const form = Object.assign({}, this.data.form)
 
     if (!this.hasFormContent(form)) {
       wx.showToast({
@@ -492,7 +547,7 @@ Page({
       this.pendingImagePath &&
       form.imagePath === this.pendingImagePath
     )
-    let uploadedImageKey = ''
+    let uploadedImageKeys = []
 
     this.setData({
       isSaving: true,
@@ -501,15 +556,23 @@ Page({
 
     try {
       let imageKey = form.imagePath ? form.imageKey || '' : ''
+      let thumbnailKey = form.imagePath ? form.thumbnailKey || imageKey : ''
 
       if (hasNewImage) {
-        uploadedImageKey = await giftApi.uploadImage(this.pendingImagePath, id)
-        imageKey = uploadedImageKey
+        const uploaded = await giftApi.uploadImages(
+          this.pendingImagePath,
+          this.pendingThumbnailPath || this.pendingImagePath,
+          id
+        )
+        imageKey = uploaded.imageKey
+        thumbnailKey = uploaded.thumbnailKey
+        uploadedImageKeys = [imageKey, thumbnailKey]
       }
 
       const payload = {
         id,
         imageKey,
+        thumbnailKey,
         name: (form.name || '').trim(),
         description: (form.description || '').trim()
       }
@@ -520,7 +583,6 @@ Page({
         ? this.data.gifts.map((item) => item.id === sourceGift.id ? savedGift : item)
         : [savedGift].concat(this.data.gifts)
       const gifts = normalizeGifts(nextGifts)
-
       // 云端保存成功后再刷新缓存和页面，避免显示尚未落盘的数据。
       this.persistGifts(gifts)
       this.cleanupPendingImage()
@@ -535,9 +597,7 @@ Page({
         icon: 'success'
       })
     } catch (error) {
-      if (uploadedImageKey) {
-        giftApi.deleteOrphan(uploadedImageKey).catch(() => {})
-      }
+      uploadedImageKeys.forEach((imageKey) => giftApi.deleteOrphan(imageKey).catch(() => {}))
 
       this.setData({
         isSaving: false,
@@ -619,20 +679,43 @@ Page({
     }
   },
 
-  previewImage(event) {
-    const current = event.currentTarget.dataset.src
-    const urls = this.data.gifts
-      .filter((gift) => gift.imagePath && gift.imageAvailable)
-      .map((gift) => gift.imagePath)
+  async previewImage(event) {
+    const id = event.currentTarget.dataset.id
+    if (!id || this.data.isPreviewLoading) return
 
-    if (!current || !urls.length) {
-      return
+    this.setData({ isPreviewLoading: true })
+    try {
+      const result = await giftApi.getGiftImage(id)
+      if (!result || !result.imageUrl) throw new Error('图片加载失败')
+      this.setData({
+        isPreviewVisible: true,
+        previewImagePath: result.imageUrl,
+        isPreviewLoading: false
+      })
+    } catch (error) {
+      this.setData({ isPreviewLoading: false })
+      this.handleCloudError(error, '图片加载失败，请稍后重试')
     }
+  },
 
-    wx.previewImage({
-      current,
-      urls
+  closePreview() {
+    this.setData({
+      isPreviewVisible: false,
+      previewImagePath: ''
     })
+  },
+
+  backToMenu() {
+    wx.navigateBack({ delta: 1 })
+  },
+
+  loadMoreGifts() {
+    if (!this.data.hasMore || this.data.isLoadingMore || !giftApi.isConfigured()) return
+    this.refreshCloudGifts(false)
+  },
+
+  onReachBottom() {
+    this.loadMoreGifts()
   },
 
   handleImageError(event) {
@@ -687,6 +770,7 @@ Page({
       this.removeSavedFile(this.pendingImagePath)
       this.pendingImagePath = ''
     }
+    this.pendingThumbnailPath = ''
   },
 
   removeSavedFile(filePath) {

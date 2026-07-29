@@ -14,6 +14,8 @@
 ```text
 gift-folder/gifts/{giftId}.json
 gift-folder/images/{giftId}/{timestamp}_{random}.{ext}
+gift-folder/thumbnails/{giftId}/{timestamp}_{random}.{ext}
+gift-folder/index.json
 ```
 
 ## 2. 创建 SCF 运行角色
@@ -23,11 +25,12 @@ gift-folder/images/{giftId}/{timestamp}_{random}.{ext}
 ```text
 GetBucket
 GetObject
+HeadObject
 PutObject
 DeleteObject
 ```
 
-资源范围选择目标存储桶及其 `gift-folder/*` 对象。`GetBucket` 用于列出 `gift-folder/gifts/`，其资源范围需要包含存储桶本身。不要直接使用账号级永久 SecretId/SecretKey。
+资源范围选择目标存储桶及其 `gift-folder/*` 对象。`GetBucket` 用于列出 `gift-folder/gifts/`，其资源范围需要包含存储桶本身；`HeadObject` 用于在保存礼品前确认已上传图片确实存在。不要直接使用账号级永久 SecretId/SecretKey。
 
 SCF 绑定运行角色后，会自动注入：
 
@@ -132,3 +135,5 @@ miniprogram/config/gift-cloud.js
 - CLS 日志只保留排障需要的最短时间，关闭 OpenID 发现模式后避免记录身份信息。
 - 在费用中心设置预算告警，并为 SCF、COS 请求量和外网下行流量设置监控告警。
 - 更新函数代码前先运行 `npm test` 和 `npm run check`。
+- 礼品列表使用 `index.json` 分页返回，每页最多 20 件；首次部署新版后，第一次读取礼品夹会自动从既有礼品 JSON 建立索引。
+- 新图片同时保存原图与压缩缩略图：列表只使用缩略图，全屏查看时才签发原图临时 URL。旧图片会回退使用原图，编辑并重新选择图片后会自动升级。

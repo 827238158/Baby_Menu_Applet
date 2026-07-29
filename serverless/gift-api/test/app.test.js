@@ -12,6 +12,7 @@ const IMAGE_KEY = 'gift-folder/images/' + GIFT_ID + '/image.jpg'
 
 function createRepository() {
   const gifts = new Map()
+  let index = null
   const deletedImages = []
   const imageInfo = new Map([
     [IMAGE_KEY, { size: 1024, contentType: 'image/jpeg' }]
@@ -32,6 +33,9 @@ function createRepository() {
     async getGift(id) {
       return gifts.get(id) || null
     },
+    async getIndex() {
+      return index
+    },
     async getImageInfo(key) {
       if (!imageInfo.has(key)) {
         const error = new Error('not found')
@@ -51,6 +55,9 @@ function createRepository() {
     },
     async listGifts() {
       return Array.from(gifts.values())
+    },
+    async putIndex(value) {
+      index = JSON.parse(JSON.stringify(value))
     },
     async putGift(gift) {
       gifts.set(gift.id, Object.assign({}, gift))
@@ -181,7 +188,8 @@ test('支持无图礼品的新增、查询、修改和删除', async () => {
   assert.equal(bodyOf(created).data.name, '陶瓷杯')
 
   const listed = await fixture.app(request('GET', '/gifts', undefined, fixture.token))
-  assert.equal(bodyOf(listed).data.length, 1)
+  assert.equal(bodyOf(listed).data.items.length, 1)
+  assert.equal(bodyOf(listed).data.total, 1)
 
   const updated = await fixture.app(request('PUT', '/gifts/' + GIFT_ID, {
     name: '',
@@ -232,7 +240,32 @@ test('仅图片礼品保存前校验 COS 实际对象', async () => {
 
   assert.equal(result.statusCode, 201)
   assert.equal(bodyOf(result).data.imageKey, IMAGE_KEY)
-  assert.match(bodyOf(result).data.imageUrl, /signed=1/)
+  assert.match(bodyOf(result).data.thumbnailUrl, /signed=1/)
+})
+
+test('礼品列表按页返回缩略图，原图仅在打开时签发', async () => {
+  const fixture = createFixture()
+  fixture.repository.gifts.set(GIFT_ID, {
+    id: GIFT_ID,
+    name: '礼品',
+    description: '',
+    imageKey: IMAGE_KEY,
+    thumbnailKey: IMAGE_KEY,
+    createdAt: 1,
+    updatedAt: 1
+  })
+
+  const listed = await fixture.app(Object.assign(
+    request('GET', '/gifts', undefined, fixture.token),
+    { queryStringParameters: { limit: '20' } }
+  ))
+  const listedData = bodyOf(listed).data
+  assert.equal(listedData.items.length, 1)
+  assert.match(listedData.items[0].thumbnailUrl, /signed=1/)
+  assert.equal(Object.hasOwn(listedData.items[0], 'imageUrl'), false)
+
+  const image = await fixture.app(request('GET', '/gifts/' + GIFT_ID + '/image', undefined, fixture.token))
+  assert.match(bodyOf(image).data.imageUrl, /signed=1/)
 })
 
 test('替换图片后旧图清理失败不影响礼品更新', async () => {

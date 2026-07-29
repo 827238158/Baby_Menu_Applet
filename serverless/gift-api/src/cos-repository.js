@@ -24,6 +24,8 @@ function isNotFound(error) {
 function createCosRepository({ cos, bucket, region, prefix, downloadUrlTtlSeconds }) {
   const giftPrefix = prefix + '/gifts/'
   const imagePrefix = prefix + '/images/'
+  const thumbnailPrefix = prefix + '/thumbnails/'
+  const indexKey = prefix + '/index.json'
 
   function giftKey(id) {
     return giftPrefix + id + '.json'
@@ -79,6 +81,17 @@ function createCosRepository({ cos, bucket, region, prefix, downloadUrlTtlSecond
     }
   }
 
+  async function getIndex() {
+    try {
+      return await readJson(indexKey)
+    } catch (error) {
+      if (isNotFound(error)) {
+        return null
+      }
+      throw error
+    }
+  }
+
   async function listGifts() {
     const keys = await listObjectKeys()
     return Promise.all(keys.map(readJson))
@@ -90,6 +103,16 @@ function createCosRepository({ cos, bucket, region, prefix, downloadUrlTtlSecond
       Region: region,
       Key: giftKey(gift.id),
       Body: JSON.stringify(gift),
+      ContentType: 'application/json; charset=utf-8'
+    })
+  }
+
+  async function putIndex(index) {
+    await callCos(cos, 'putObject', {
+      Bucket: bucket,
+      Region: region,
+      Key: indexKey,
+      Body: JSON.stringify(index),
       ContentType: 'application/json; charset=utf-8'
     })
   }
@@ -154,13 +177,13 @@ function createCosRepository({ cos, bucket, region, prefix, downloadUrlTtlSecond
 
   function isImageKeyForGift(key, id) {
     return typeof key === 'string' &&
-      key.startsWith(imagePrefix + id + '/') &&
+      (key.startsWith(imagePrefix + id + '/') || key.startsWith(thumbnailPrefix + id + '/')) &&
       !key.includes('..')
   }
 
   function isImageKey(key) {
     return typeof key === 'string' &&
-      key.startsWith(imagePrefix) &&
+      (key.startsWith(imagePrefix) || key.startsWith(thumbnailPrefix)) &&
       !key.includes('..')
   }
 
@@ -169,11 +192,13 @@ function createCosRepository({ cos, bucket, region, prefix, downloadUrlTtlSecond
     deleteImage,
     getDownloadUrl,
     getGift,
+    getIndex,
     getImageInfo,
     getUploadUrl,
     isImageKey,
     isImageKeyForGift,
     listGifts,
+    putIndex,
     putGift
   }
 }

@@ -99,7 +99,7 @@ function waitForMicrotasks() {
   return new Promise((resolve) => setImmediate(resolve))
 }
 
-test('页面先展示本地缓存，再用云端列表覆盖缓存', async () => {
+test('云端授权成功后才展示礼品列表，避免未授权账号看到本地缓存', async () => {
   const localGift = {
     id: 'gift_local123',
     name: '本地缓存',
@@ -124,7 +124,7 @@ test('页面先展示本地缓存，再用云端列表覆盖缓存', async () =>
   }, wxMock)
 
   page.onShow()
-  assert.equal(page.data.gifts[0].name, '本地缓存')
+  assert.equal(page.data.gifts.length, 0)
 
   await waitForMicrotasks()
   assert.equal(page.data.gifts[0].name, '云端礼品')
@@ -175,7 +175,7 @@ test('图片上传失败时保留表单且不调用礼品保存', async () => {
   let createCalled = false
   const page = loadPage({
     isConfigured: () => true,
-    uploadImage: async () => {
+    uploadImages: async () => {
       const error = new Error('图片上传失败')
       error.code = 'IMAGE_UPLOAD_FAILED'
       throw error
@@ -202,6 +202,118 @@ test('图片上传失败时保留表单且不调用礼品保存', async () => {
   assert.equal(page.data.form.imagePath, 'wxfile://selected.jpg')
   assert.equal(page.data.gifts.length, 0)
   assert.equal(wxMock.toasts.at(-1).title, '图片上传失败')
+})
+
+test('白名单外账号只显示受限状态，不展示本地缓存礼品', () => {
+  const wxMock = createWxMock([{
+    id: 'gift_cached123',
+    name: '本地礼品',
+    description: '',
+    imagePath: '',
+    createdAt: 1,
+    updatedAt: 1
+  }])
+  const page = loadPage({ isConfigured: () => false }, wxMock)
+  page.loadGifts()
+
+  const error = new Error('当前微信账号无权访问礼品夹')
+  error.code = 'FORBIDDEN'
+  page.handleCloudError(error, '')
+
+  assert.equal(page.data.accessDenied, true)
+  assert.equal(page.data.gifts.length, 0)
+  assert.equal(page.data.giftCount, 0)
+  assert.equal(page.data.hasMore, false)
+})
+
+test('填写礼品名称仅更新本地表单，点击保存后才创建礼品', async () => {
+  const wxMock = createWxMock()
+  let received
+  const page = loadPage({
+    isConfigured: () => true,
+    createGift: async (gift) => {
+      received = gift
+      return Object.assign({}, gift, { createdAt: 12, updatedAt: 12 })
+    }
+  }, wxMock)
+  page.openCreateForm()
+  page.handleNameInput({ detail: { value: '自动保存礼品' } })
+
+  assert.equal(received, undefined)
+  assert.equal(page.data.saveDisabled, false)
+
+  await page.saveGift()
+
+  assert.equal(received.name, '自动保存礼品')
+  assert.equal(page.data.gifts.length, 1)
+  assert.equal(page.data.formVisible, false)
+})
+
+test('无待保存内容时点击遮罩会启动抽屉滑出动画', () => {
+  const wxMock = createWxMock()
+  const page = loadPage({ isConfigured: () => false }, wxMock)
+  page.openCreateForm()
+
+  page.requestCloseForm()
+
+  assert.equal(page.data.formClosing, true)
+  assert.match(page.data.formSheetStyle, /translateY\(100%\)/)
+  clearTimeout(page.closeTimer)
+})
+
+test('关闭抽屉时不会保存未提交的内容', () => {
+  const wxMock = createWxMock()
+  let createCalled = false
+  const page = loadPage({
+    isConfigured: () => true,
+    createGift: async () => { createCalled = true }
+  }, wxMock)
+  page.openCreateForm()
+  page.handleDescriptionInput({ detail: { value: '未提交内容' } })
+
+  page.requestCloseForm()
+
+  assert.equal(createCalled, false)
+  assert.equal(page.data.formClosing, true)
+  clearTimeout(page.closeTimer)
+})
+
+test('保存失败时保留表单与本地图片预览', async () => {
+  const wxMock = createWxMock()
+  const page = loadPage({
+    isConfigured: () => true,
+    createGift: async () => {
+      throw new Error('网络连接失败')
+    }
+  }, wxMock)
+  page.data.formVisible = true
+  page.data.form = {
+    id: '',
+    imagePath: 'wxfile://local-preview.jpg',
+    imageKey: '',
+    thumbnailKey: '',
+    name: '保存失败礼品',
+    description: ''
+  }
+
+  await page.saveGift()
+  await waitForMicrotasks()
+
+  assert.equal(page.data.formVisible, true)
+  assert.equal(page.data.formClosing, false)
+  assert.equal(page.data.form.imagePath, 'wxfile://local-preview.jpg')
+})
+
+test('顶部下滑超过阈值时也会启动抽屉滑出动画', () => {
+  const wxMock = createWxMock()
+  const page = loadPage({ isConfigured: () => false }, wxMock)
+  page.openCreateForm()
+
+  page.handleFormDragStart({ touches: [{ clientY: 100 }] })
+  page.handleFormDragEnd({ changedTouches: [{ clientY: 200 }] })
+
+  assert.equal(page.data.formClosing, true)
+  clearTimeout(page.closeTimer)
 })
 
 test('云端删除失败时不修改页面列表和本地缓存', async () => {

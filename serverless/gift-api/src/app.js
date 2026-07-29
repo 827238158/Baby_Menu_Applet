@@ -145,16 +145,50 @@ function createApp({
       name: gift.name || '',
       description: gift.description || '',
       imageKey: gift.imageKey || '',
-      imageUrl: '',
+      thumbnailUrl: '',
       createdAt: gift.createdAt,
       updatedAt: gift.updatedAt
     }
 
-    if (gift.imageKey) {
-      result.imageUrl = await repository.getDownloadUrl(gift.imageKey)
+    const thumbnailKey = gift.thumbnailKey || gift.imageKey
+    if (thumbnailKey) {
+      result.thumbnailUrl = await repository.getDownloadUrl(thumbnailKey)
     }
 
     return result
+  }
+
+  async function getIndex() {
+    const stored = await repository.getIndex()
+
+    if (stored && Array.isArray(stored.gifts)) {
+      return stored.gifts
+    }
+
+    // 首次升级时从旧 JSON 重建索引，避免既有礼品丢失。
+    const gifts = await repository.listGifts()
+    gifts.sort((left, right) => Number(right.createdAt) - Number(left.createdAt))
+    await repository.putIndex({ gifts, updatedAt: now() })
+    return gifts
+  }
+
+  async function saveIndex(gifts) {
+    const sorted = gifts.slice().sort((left, right) => Number(right.createdAt) - Number(left.createdAt))
+    await repository.putIndex({ gifts: sorted, updatedAt: now() })
+  }
+
+  function parseCursor(value) {
+    if (!value) return 0
+    try {
+      const offset = Number(Buffer.from(String(value), 'base64url').toString('utf8'))
+      return Number.isInteger(offset) && offset >= 0 ? offset : 0
+    } catch (error) {
+      return 0
+    }
+  }
+
+  function createCursor(offset) {
+    return Buffer.from(String(offset), 'utf8').toString('base64url')
   }
 
   async function login(event) {
@@ -185,10 +219,20 @@ function createApp({
     return success(tokenService.issue(identity.openId))
   }
 
-  async function listGifts() {
-    const gifts = await repository.listGifts()
-    gifts.sort((left, right) => Number(right.createdAt) - Number(left.createdAt))
-    return success(await Promise.all(gifts.map(presentGift)))
+  async function listGifts(event) {
+    const query = event.queryStringParameters || {}
+    const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 20)
+    const offset = parseCursor(query.cursor)
+    const gifts = await getIndex()
+    const page = gifts.slice(offset, offset + limit)
+    const nextOffset = offset + page.length
+
+    return success({
+      items: await Promise.all(page.map(presentGift)),
+      total: gifts.length,
+      hasMore: nextOffset < gifts.length,
+      nextCursor: nextOffset < gifts.length ? createCursor(nextOffset) : ''
+    })
   }
 
   async function createGift(event) {
@@ -204,6 +248,7 @@ function createApp({
       name: normalizeText(body.name, 40, '礼品名称'),
       description: normalizeText(body.description, 200, '简介'),
       imageKey: String(body.imageKey || ''),
+      thumbnailKey: String(body.thumbnailKey || ''),
       createdAt: now(),
       updatedAt: now()
     }
@@ -213,7 +258,10 @@ function createApp({
     }
 
     await validateImage(gift.imageKey, id)
+    await validateImage(gift.thumbnailKey, id)
     await repository.putGift(gift)
+    const gifts = await getIndex()
+    await saveIndex([gift].concat(gifts.filter((item) => item.id !== id)))
     return success(await presentGift(gift), 201)
   }
 
@@ -230,6 +278,7 @@ function createApp({
       name: normalizeText(body.name, 40, '礼品名称'),
       description: normalizeText(body.description, 200, '简介'),
       imageKey: String(body.imageKey || ''),
+      thumbnailKey: String(body.thumbnailKey || ''),
       createdAt: Number(existing.createdAt) || now(),
       updatedAt: now()
     }
@@ -239,13 +288,23 @@ function createApp({
     }
 
     await validateImage(gift.imageKey, id)
+    await validateImage(gift.thumbnailKey, id)
     await repository.putGift(gift)
+    const gifts = await getIndex()
+    await saveIndex([gift].concat(gifts.filter((item) => item.id !== id)))
 
     if (existing.imageKey && existing.imageKey !== gift.imageKey) {
       try {
         await repository.deleteImage(existing.imageKey)
       } catch (error) {
         logger.warn('旧礼品图片清理失败', { id, imageKey: existing.imageKey })
+      }
+    }
+    if (existing.thumbnailKey && existing.thumbnailKey !== gift.thumbnailKey && existing.thumbnailKey !== existing.imageKey) {
+      try {
+        await repository.deleteImage(existing.thumbnailKey)
+      } catch (error) {
+        logger.warn('旧礼品缩略图清理失败', { id, imageKey: existing.thumbnailKey })
       }
     }
 
@@ -260,12 +319,21 @@ function createApp({
     }
 
     await repository.deleteGift(id)
+    const gifts = await getIndex()
+    await saveIndex(gifts.filter((item) => item.id !== id))
 
     if (existing.imageKey) {
       try {
         await repository.deleteImage(existing.imageKey)
       } catch (error) {
         logger.warn('礼品图片清理失败', { id, imageKey: existing.imageKey })
+      }
+    }
+    if (existing.thumbnailKey && existing.thumbnailKey !== existing.imageKey) {
+      try {
+        await repository.deleteImage(existing.thumbnailKey)
+      } catch (error) {
+        logger.warn('礼品缩略图清理失败', { id, imageKey: existing.thumbnailKey })
       }
     }
 
@@ -287,7 +355,9 @@ function createApp({
       throw new HttpError(400, 'IMAGE_TOO_LARGE', '图片大小不能超过 8MB')
     }
 
-    const imageKey = config.cosPrefix + '/images/' + giftId + '/' +
+    const asset = String(body.asset || 'image') === 'thumbnail' ? 'thumbnail' : 'image'
+    const objectPrefix = asset === 'thumbnail' ? 'thumbnails' : 'images'
+    const imageKey = config.cosPrefix + '/' + objectPrefix + '/' + giftId + '/' +
       now() + '_' + randomBytes(8) + '.' + extension
     const uploadUrl = await repository.getUploadUrl(
       imageKey,
@@ -337,7 +407,7 @@ function createApp({
       requireUser(event)
 
       if (method === 'GET' && path === '/gifts') {
-        return await listGifts()
+        return await listGifts(event)
       }
 
       if (method === 'POST' && path === '/gifts') {
@@ -350,6 +420,14 @@ function createApp({
       }
       if (giftMatch && method === 'DELETE') {
         return await deleteGift(validateGiftId(giftMatch[1]))
+      }
+      const imageMatch = path.match(/^\/gifts\/([^/]+)\/image$/)
+      if (imageMatch && method === 'GET') {
+        const gift = await repository.getGift(validateGiftId(imageMatch[1]))
+        if (!gift || !gift.imageKey) {
+          throw new HttpError(404, 'IMAGE_NOT_FOUND', '礼品图片不存在')
+        }
+        return success({ imageUrl: await repository.getDownloadUrl(gift.imageKey) })
       }
 
       if (method === 'POST' && path === '/uploads/presign') {
