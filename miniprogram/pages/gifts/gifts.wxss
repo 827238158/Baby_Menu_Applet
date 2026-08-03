@@ -66,6 +66,61 @@
   margin-top: 24rpx;
 }
 
+.gift-skeleton-list {
+  margin-top: 24rpx;
+}
+
+.gift-skeleton-card {
+  pointer-events: none;
+}
+
+.gift-skeleton-image {
+  flex: 0 0 auto;
+  width: 164rpx;
+  min-height: 152rpx;
+  border-radius: 18rpx;
+}
+
+.gift-skeleton-info {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  padding: 8rpx 0;
+}
+
+.gift-skeleton-title {
+  width: 48%;
+  height: 32rpx;
+  border-radius: 10rpx;
+}
+
+.gift-skeleton-line {
+  height: 22rpx;
+  border-radius: 8rpx;
+}
+
+.gift-skeleton-line-long {
+  width: 86%;
+  margin-top: 24rpx;
+}
+
+.gift-skeleton-line-short {
+  width: 58%;
+  margin-top: 14rpx;
+}
+
+.gift-skeleton-block {
+  background: linear-gradient(
+    100deg,
+    rgba(238, 226, 222, 0.72) 20%,
+    rgba(249, 243, 241, 0.96) 42%,
+    rgba(238, 226, 222, 0.72) 64%
+  );
+  background-size: 220% 100%;
+  animation: gift-skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
 .load-more {
   margin: 24rpx 0 8rpx;
   padding: 20rpx;
@@ -145,6 +200,23 @@
   border-radius: 24rpx;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 12rpx 28rpx rgba(109, 84, 78, 0.08);
+  animation: content-rise-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: center top;
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease-out;
+}
+
+.gift-card:active {
+  transform: scale(0.992);
+  box-shadow: 0 8rpx 20rpx rgba(109, 84, 78, 0.08);
+}
+
+.gift-card-emphasis {
+  animation: gift-card-emphasis 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.gift-card-removing {
+  pointer-events: none;
+  animation: gift-card-remove 240ms ease-in both;
 }
 
 .gift-image-wrap {
@@ -354,6 +426,7 @@
   color: #ffffff;
   background: #d97986;
   box-shadow: 0 8rpx 18rpx rgba(217, 121, 134, 0.2);
+  transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 150ms ease-out, background-color 150ms ease-out;
 }
 
 .floating-add-button {
@@ -379,22 +452,39 @@
   color: #ffffff;
   background: #d97986;
   box-shadow: 0 14rpx 30rpx rgba(112, 73, 80, 0.24);
+  transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 150ms ease-out, background-color 150ms ease-out;
 }
 
 .floating-add-icon {
-  display: block;
-  width: 100%;
-  font-size: 48rpx;
-  font-weight: 700;
-  line-height: 1;
-  text-align: center;
+  position: relative;
+  width: 34rpx;
+  height: 34rpx;
+}
+
+.floating-add-stroke {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 999rpx;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+
+.floating-add-stroke-horizontal {
+  width: 34rpx;
+  height: 4rpx;
+}
+
+.floating-add-stroke-vertical {
+  width: 4rpx;
+  height: 34rpx;
 }
 
 .empty-add-button:active,
 .floating-add-button:active,
 .save-button:active,
 .delete-button:active {
-  transform: scale(0.96);
+  transform: scale(0.95);
 }
 
 .form-mask {
@@ -410,6 +500,11 @@
   animation: mask-fade-in 180ms ease-out;
 }
 
+.motion-mask-closing {
+  pointer-events: none;
+  animation: mask-fade-out 220ms ease-in both;
+}
+
 .form-panel {
   display: flex;
   overflow: hidden;
@@ -422,8 +517,8 @@
   flex-direction: column;
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 -18rpx 48rpx rgba(80, 54, 58, 0.18);
-  animation: sheet-slide-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  transition: transform 180ms ease-out;
+  animation: sheet-slide-up 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 240ms ease-out;
 }
 
 .form-drag-zone {
@@ -496,6 +591,7 @@
 }
 
 .image-picker-plus {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -503,10 +599,27 @@
   width: 68rpx;
   height: 68rpx;
   border-radius: 50%;
-  font-size: 40rpx;
-  line-height: 68rpx;
   color: #ffffff;
   background: #d97986;
+}
+
+.image-picker-plus-stroke {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 999rpx;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+
+.image-picker-plus-stroke-horizontal {
+  width: 28rpx;
+  height: 4rpx;
+}
+
+.image-picker-plus-stroke-vertical {
+  width: 4rpx;
+  height: 28rpx;
 }
 
 .image-picker-label {
@@ -516,39 +629,31 @@
   color: #847a73;
 }
 
-.image-picker-optional {
-  margin-top: 6rpx;
-  font-size: 20rpx;
-  line-height: 1.3;
-  color: #b09f99;
-}
-
-.image-picker-actions {
+.image-picker-remove {
+  position: absolute;
+  z-index: 2;
+  top: 16rpx;
+  left: 16rpx;
   display: flex;
   align-items: center;
-  gap: 14rpx;
-  margin-top: 16rpx;
-}
-
-.image-source-button,
-.image-remove-button {
-  flex: 1;
+  justify-content: center;
+  flex: none;
   box-sizing: border-box;
-  min-height: 64rpx;
+  width: 54rpx;
+  min-width: 54rpx;
+  max-width: 54rpx;
+  height: 54rpx;
+  min-height: 54rpx;
+  max-height: 54rpx;
   margin: 0;
-  padding: 0 12rpx;
+  padding: 0;
   border-radius: 999rpx;
-  font-size: 23rpx;
-  line-height: 64rpx;
-  color: #795f59;
-  background: #f6eeec;
-}
-
-.image-remove-button {
-  flex: 0 0 112rpx;
-  border: 1rpx solid #efd5d8;
-  color: #c45f72;
-  background: #fff8f8;
+  font-size: 38rpx;
+  font-weight: 300;
+  line-height: 1;
+  color: #ffffff;
+  background: rgba(42, 35, 33, 0.56);
+  box-shadow: 0 4rpx 14rpx rgba(42, 35, 33, 0.2);
 }
 
 .image-preview-mask {
@@ -562,6 +667,7 @@
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.94);
+  animation: preview-mask-in 220ms ease-out both;
 }
 
 .image-preview-panel {
@@ -571,6 +677,16 @@
   align-items: center;
   justify-content: center;
   flex-direction: column;
+  animation: preview-scale-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.image-preview-mask-closing {
+  pointer-events: none;
+  animation: mask-fade-out 220ms ease-in both;
+}
+
+.image-preview-panel-closing {
+  animation: preview-scale-out 200ms ease-in both;
 }
 
 .image-preview-full {
@@ -590,6 +706,12 @@
   line-height: 64rpx;
   color: #ffffff;
   background: rgba(255, 255, 255, 0.16);
+  transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1), background-color 150ms ease-out;
+}
+
+.image-preview-exit:active {
+  transform: scale(0.96);
+  background: rgba(255, 255, 255, 0.24);
 }
 
 .form-field {
@@ -666,6 +788,7 @@
   font-size: 27rpx;
   font-weight: 800;
   line-height: 80rpx;
+  transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 150ms ease-out, background-color 150ms ease-out;
 }
 
 .save-button {
@@ -708,6 +831,134 @@
   }
 }
 
+@keyframes mask-fade-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes content-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12rpx);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes gift-card-emphasis {
+  0% {
+    opacity: 0.82;
+    transform: translateY(10rpx) scale(0.985);
+  }
+
+  68% {
+    opacity: 1;
+    transform: translateY(0) scale(1.012);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes gift-card-remove {
+  from {
+    opacity: 1;
+    max-height: 600rpx;
+    margin-bottom: 18rpx;
+    padding-top: 16rpx;
+    padding-bottom: 16rpx;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    max-height: 0;
+    min-height: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-width: 0;
+    transform: scale(0.98);
+  }
+}
+
+@keyframes preview-mask-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes preview-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes preview-scale-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+@keyframes gift-skeleton-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gift-skeleton-block,
+  .gift-card,
+  .gift-card-emphasis,
+  .gift-card-removing,
+  .form-mask,
+  .form-panel,
+  .image-preview-mask,
+  .image-preview-panel {
+    animation: none;
+  }
+
+  .gift-card,
+  .empty-add-button,
+  .floating-add-button,
+  .form-panel,
+  .save-button,
+  .delete-button,
+  .image-preview-exit {
+    transition: none;
+  }
+}
+
 @media (max-width: 360px) {
   .page {
     padding-right: 18rpx;
@@ -720,6 +971,10 @@
   }
 
   .gift-image-wrap {
+    width: 138rpx;
+  }
+
+  .gift-skeleton-image {
     width: 138rpx;
   }
 

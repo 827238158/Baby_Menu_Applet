@@ -8,22 +8,25 @@ const IMAGE_TYPES = new Map([
   ['image/webp', 'webp']
 ])
 const GIFT_ID_PATTERN = /^gift_[A-Za-z0-9_-]{8,72}$/
+const INDEX_SCHEMA_VERSION = 2
+const LOGIN_RATE_LIMIT_MAX_ENTRIES = 1000
 
 class HttpError extends Error {
-  constructor(statusCode, code, message) {
+  constructor(statusCode, code, message, headers = {}) {
     super(message)
     this.statusCode = statusCode
     this.code = code
+    this.headers = headers
   }
 }
 
-function response(statusCode, payload) {
+function response(statusCode, payload, headers = {}) {
   return {
     statusCode,
-    headers: {
+    headers: Object.assign({
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store'
-    },
+    }, headers),
     body: JSON.stringify(payload)
   }
 }
@@ -32,20 +35,30 @@ function success(data, statusCode = 200) {
   return response(statusCode, { data })
 }
 
-function parseBody(event) {
+function parseBody(event, maxBytes) {
   if (!event.body) {
     return {}
   }
 
+  let text
   if (typeof event.body === 'object') {
-    return event.body
+    try {
+      text = JSON.stringify(event.body)
+    } catch (error) {
+      throw new HttpError(400, 'INVALID_JSON', '请求内容不是有效 JSON')
+    }
+  } else {
+    text = event.isBase64Encoded
+      ? Buffer.from(event.body, 'base64').toString('utf8')
+      : String(event.body)
+  }
+
+  if (Buffer.byteLength(text, 'utf8') > maxBytes) {
+    throw new HttpError(413, 'REQUEST_TOO_LARGE', '请求内容过大')
   }
 
   try {
-    const text = event.isBase64Encoded
-      ? Buffer.from(event.body, 'base64').toString('utf8')
-      : event.body
-    return JSON.parse(text)
+    return typeof event.body === 'object' ? event.body : JSON.parse(text)
   } catch (error) {
     throw new HttpError(400, 'INVALID_JSON', '请求内容不是有效 JSON')
   }
@@ -88,6 +101,24 @@ function normalizeText(value, maxLength, fieldName) {
   return text
 }
 
+function compareGifts(left, right) {
+  const timeDifference = Number(right.createdAt) - Number(left.createdAt)
+  if (timeDifference) return timeDifference
+
+  const leftId = String(left.id || '')
+  const rightId = String(right.id || '')
+  if (leftId === rightId) return 0
+  return leftId > rightId ? -1 : 1
+}
+
+function sortGifts(gifts) {
+  return gifts.slice().sort(compareGifts)
+}
+
+function sleep(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+}
+
 function createApp({
   config,
   repository,
@@ -97,6 +128,12 @@ function createApp({
   randomBytes = (size) => crypto.randomBytes(size).toString('hex'),
   logger = console
 }) {
+  const loginAttempts = new Map()
+
+  function bodyOf(event) {
+    return parseBody(event, config.maxJsonBodyBytes || 8 * 1024)
+  }
+
   function requireUser(event) {
     const authorization = getHeader(event.headers, 'authorization')
     const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : ''
@@ -114,6 +151,36 @@ function createApp({
     return payload.sub
   }
 
+  function enforceLoginRateLimit(event) {
+    const currentTime = now()
+    const windowMs = config.loginRateLimitWindowMs || 60 * 1000
+    const maxAttempts = config.loginRateLimitMax || 10
+    const sourceIp = getHeader(event.headers, 'x-scf-remote-addr') || 'unknown'
+
+    for (const [key, value] of loginAttempts) {
+      if (value.startedAt + windowMs <= currentTime) {
+        loginAttempts.delete(key)
+      }
+    }
+    if (loginAttempts.size >= LOGIN_RATE_LIMIT_MAX_ENTRIES && !loginAttempts.has(sourceIp)) {
+      loginAttempts.delete(loginAttempts.keys().next().value)
+    }
+
+    const existing = loginAttempts.get(sourceIp)
+    if (!existing || existing.startedAt + windowMs <= currentTime) {
+      loginAttempts.set(sourceIp, { count: 1, startedAt: currentTime })
+      return
+    }
+
+    existing.count += 1
+    if (existing.count > maxAttempts) {
+      const retryAfter = Math.max(1, Math.ceil((existing.startedAt + windowMs - currentTime) / 1000))
+      throw new HttpError(429, 'LOGIN_RATE_LIMITED', '登录请求过于频繁，请稍后重试', {
+        'retry-after': String(retryAfter)
+      })
+    }
+  }
+
   async function validateImage(imageKey, giftId) {
     if (!imageKey) {
       return
@@ -127,7 +194,11 @@ function createApp({
     try {
       info = await repository.getImageInfo(imageKey)
     } catch (error) {
-      throw new HttpError(400, 'IMAGE_NOT_FOUND', '上传的图片不存在')
+      if (repository.isNotFoundError(error)) {
+        throw new HttpError(400, 'IMAGE_NOT_FOUND', '上传的图片不存在')
+      }
+      logger.error('COS 图片校验失败', { giftId, imageKey, error })
+      throw new HttpError(503, 'IMAGE_VALIDATION_UNAVAILABLE', '图片校验暂时不可用，请稍后重试')
     }
 
     if (!IMAGE_TYPES.has(info.contentType)) {
@@ -139,15 +210,20 @@ function createApp({
     }
   }
 
-  async function presentGift(gift) {
+  async function presentGift(gift, total) {
     const result = {
       id: gift.id,
       name: gift.name || '',
       description: gift.description || '',
       imageKey: gift.imageKey || '',
+      thumbnailKey: gift.thumbnailKey || '',
       thumbnailUrl: '',
       createdAt: gift.createdAt,
       updatedAt: gift.updatedAt
+    }
+
+    if (Number.isInteger(total)) {
+      result.total = total
     }
 
     const thumbnailKey = gift.thumbnailKey || gift.imageKey
@@ -158,41 +234,150 @@ function createApp({
     return result
   }
 
-  async function getIndex() {
-    const stored = await repository.getIndex()
+  function normalizeIndex(stored, legacyGifts = []) {
+    const hasStoredIndex = stored && Array.isArray(stored.gifts)
+    const gifts = sortGifts(hasStoredIndex ? stored.gifts : legacyGifts)
+    const revision = Number.isInteger(stored && stored.revision) && stored.revision >= 0
+      ? stored.revision
+      : 0
 
-    if (stored && Array.isArray(stored.gifts)) {
-      return stored.gifts
+    return {
+      index: {
+        schemaVersion: INDEX_SCHEMA_VERSION,
+        revision,
+        updatedAt: Number(stored && stored.updatedAt) || now(),
+        gifts
+      },
+      needsMigration: !hasStoredIndex || stored.schemaVersion !== INDEX_SCHEMA_VERSION
     }
-
-    // 首次升级时从旧 JSON 重建索引，避免既有礼品丢失。
-    const gifts = await repository.listGifts()
-    gifts.sort((left, right) => Number(right.createdAt) - Number(left.createdAt))
-    await repository.putIndex({ gifts, updatedAt: now() })
-    return gifts
   }
 
-  async function saveIndex(gifts) {
-    const sorted = gifts.slice().sort((left, right) => Number(right.createdAt) - Number(left.createdAt))
-    await repository.putIndex({ gifts: sorted, updatedAt: now() })
+  async function readIndex() {
+    const stored = await repository.getIndex()
+    if (stored && Array.isArray(stored.gifts)) {
+      return normalizeIndex(stored)
+    }
+
+    const legacyGifts = await repository.listLegacyGifts()
+    return normalizeIndex(null, legacyGifts)
+  }
+
+  async function acquireMutationLock() {
+    const owner = randomBytes(12)
+    const waitDeadline = Date.now() + (config.mutationLockWaitMs || 2000)
+
+    while (Date.now() <= waitDeadline) {
+      const acquired = await repository.tryAcquireMutationLock({
+        owner,
+        createdAt: now(),
+        expiresAt: now() + (config.mutationLockLeaseMs || 30 * 1000)
+      })
+      if (acquired) return owner
+
+      const existing = await repository.getMutationLock()
+      if (existing && Number(existing.expiresAt) <= now()) {
+        await repository.releaseMutationLock(existing.owner).catch(() => false)
+        continue
+      }
+      await sleep(40)
+    }
+
+    throw new HttpError(503, 'GIFT_BUSY', '礼品夹正在同步，请稍后重试', {
+      'retry-after': '1'
+    })
+  }
+
+  async function withIndexLock(callback) {
+    const owner = await acquireMutationLock()
+    try {
+      return await callback()
+    } finally {
+      try {
+        await repository.releaseMutationLock(owner)
+      } catch (error) {
+        logger.warn('COS 索引锁释放失败', { owner, error })
+      }
+    }
+  }
+
+  async function ensureIndex() {
+    const state = await readIndex()
+    if (!state.needsMigration) return state.index
+
+    return withIndexLock(async () => {
+      const latest = await readIndex()
+      if (!latest.needsMigration) return latest.index
+
+      const migrated = Object.assign({}, latest.index, {
+        revision: Math.max(1, latest.index.revision),
+        updatedAt: now()
+      })
+      await repository.putIndex(migrated)
+      logger.info('礼品索引已升级到 schemaVersion 2', {
+        total: migrated.gifts.length,
+        revision: migrated.revision
+      })
+      return migrated
+    })
+  }
+
+  async function mutateIndex(mutator) {
+    return withIndexLock(async () => {
+      const state = await readIndex()
+      const mutation = await mutator(state.index)
+
+      if (mutation.changed === false && !state.needsMigration) {
+        return Object.assign({}, mutation, { index: state.index })
+      }
+
+      const nextIndex = {
+        schemaVersion: INDEX_SCHEMA_VERSION,
+        revision: state.index.revision + 1,
+        updatedAt: now(),
+        gifts: sortGifts(mutation.gifts || state.index.gifts)
+      }
+      await repository.putIndex(nextIndex)
+      return Object.assign({}, mutation, { index: nextIndex })
+    })
   }
 
   function parseCursor(value) {
-    if (!value) return 0
+    if (!value) return { type: 'start' }
     try {
-      const offset = Number(Buffer.from(String(value), 'base64url').toString('utf8'))
-      return Number.isInteger(offset) && offset >= 0 ? offset : 0
-    } catch (error) {
-      return 0
-    }
+      const decoded = Buffer.from(String(value), 'base64url').toString('utf8')
+      if (/^\d+$/.test(decoded)) {
+        return { type: 'offset', offset: Number(decoded) }
+      }
+      const cursor = JSON.parse(decoded)
+      if (cursor && cursor.v === 2 && Number.isFinite(cursor.createdAt) && cursor.id) {
+        return {
+          type: 'keyset',
+          createdAt: Number(cursor.createdAt),
+          id: String(cursor.id)
+        }
+      }
+    } catch (error) {}
+    return { type: 'start' }
   }
 
-  function createCursor(offset) {
-    return Buffer.from(String(offset), 'utf8').toString('base64url')
+  function createCursor(gift) {
+    return Buffer.from(JSON.stringify({
+      v: 2,
+      createdAt: Number(gift.createdAt),
+      id: String(gift.id)
+    }), 'utf8').toString('base64url')
+  }
+
+  function isSameGiftPayload(existing, draft) {
+    return existing.name === draft.name &&
+      existing.description === draft.description &&
+      (existing.imageKey || '') === draft.imageKey &&
+      (existing.thumbnailKey || '') === draft.thumbnailKey
   }
 
   async function login(event) {
-    const body = parseBody(event)
+    enforceLoginRateLimit(event)
+    const body = bodyOf(event)
     const code = String(body.code || '').trim()
 
     if (!code || code.length > 128) {
@@ -208,7 +393,6 @@ function createApp({
     }
 
     if (config.openIdDiscovery) {
-      // 发现模式只写日志，不会放行未授权用户。
       logger.info('[OPENID_DISCOVERY] openid=' + identity.openId)
     }
 
@@ -222,36 +406,44 @@ function createApp({
   async function listGifts(event) {
     const query = event.queryStringParameters || {}
     const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 20)
-    const offset = parseCursor(query.cursor)
-    const gifts = await getIndex()
-    const page = gifts.slice(offset, offset + limit)
-    const nextOffset = offset + page.length
+    const cursor = parseCursor(query.cursor)
+    const index = await ensureIndex()
+    let candidates = index.gifts
+
+    if (cursor.type === 'offset') {
+      candidates = candidates.slice(cursor.offset)
+    } else if (cursor.type === 'keyset') {
+      candidates = candidates.filter((gift) => compareGifts(gift, cursor) > 0)
+    }
+
+    const page = candidates.slice(0, limit)
+    const hasMore = candidates.length > page.length
 
     return success({
-      items: await Promise.all(page.map(presentGift)),
-      total: gifts.length,
-      hasMore: nextOffset < gifts.length,
-      nextCursor: nextOffset < gifts.length ? createCursor(nextOffset) : ''
+      items: await Promise.all(page.map((gift) => presentGift(gift))),
+      total: index.gifts.length,
+      hasMore,
+      nextCursor: hasMore && page.length ? createCursor(page[page.length - 1]) : ''
     })
   }
 
-  async function createGift(event) {
-    const body = parseBody(event)
-    const id = validateGiftId(body.id)
-
-    if (await repository.getGift(id)) {
-      throw new HttpError(409, 'GIFT_EXISTS', '礼品已经存在')
-    }
-
-    const gift = {
+  function createGiftDraft(body, id, createdAt) {
+    return {
       id,
       name: normalizeText(body.name, 40, '礼品名称'),
       description: normalizeText(body.description, 200, '简介'),
       imageKey: String(body.imageKey || ''),
       thumbnailKey: String(body.thumbnailKey || ''),
-      createdAt: now(),
-      updatedAt: now()
+      createdAt,
+      updatedAt: createdAt
     }
+  }
+
+  async function createGift(event) {
+    const body = bodyOf(event)
+    const id = validateGiftId(body.id)
+    const createdAt = now()
+    const gift = createGiftDraft(body, id, createdAt)
 
     if (!gift.name && !gift.description && !gift.imageKey) {
       throw new HttpError(400, 'EMPTY_GIFT', '请添加图片或文字')
@@ -259,89 +451,103 @@ function createApp({
 
     await validateImage(gift.imageKey, id)
     await validateImage(gift.thumbnailKey, id)
-    await repository.putGift(gift)
-    const gifts = await getIndex()
-    await saveIndex([gift].concat(gifts.filter((item) => item.id !== id)))
-    return success(await presentGift(gift), 201)
+
+    const mutation = await mutateIndex(async (index) => {
+      const existing = index.gifts.find((item) => item.id === id)
+      if (existing) {
+        if (isSameGiftPayload(existing, gift)) {
+          return { changed: false, gift: existing, created: false }
+        }
+        throw new HttpError(409, 'GIFT_EXISTS', '礼品已经存在')
+      }
+
+      return {
+        changed: true,
+        gift,
+        created: true,
+        gifts: [gift].concat(index.gifts)
+      }
+    })
+    const total = mutation.index.gifts.length
+    return success(await presentGift(mutation.gift, total), mutation.created ? 201 : 200)
   }
 
   async function updateGift(event, id) {
-    const body = parseBody(event)
-    const existing = await repository.getGift(id)
+    const body = bodyOf(event)
+    const draft = createGiftDraft(body, id, now())
 
-    if (!existing) {
-      throw new HttpError(404, 'GIFT_NOT_FOUND', '礼品不存在')
-    }
-
-    const gift = {
-      id,
-      name: normalizeText(body.name, 40, '礼品名称'),
-      description: normalizeText(body.description, 200, '简介'),
-      imageKey: String(body.imageKey || ''),
-      thumbnailKey: String(body.thumbnailKey || ''),
-      createdAt: Number(existing.createdAt) || now(),
-      updatedAt: now()
-    }
-
-    if (!gift.name && !gift.description && !gift.imageKey) {
+    if (!draft.name && !draft.description && !draft.imageKey) {
       throw new HttpError(400, 'EMPTY_GIFT', '请添加图片或文字')
     }
 
-    await validateImage(gift.imageKey, id)
-    await validateImage(gift.thumbnailKey, id)
-    await repository.putGift(gift)
-    const gifts = await getIndex()
-    await saveIndex([gift].concat(gifts.filter((item) => item.id !== id)))
+    await validateImage(draft.imageKey, id)
+    await validateImage(draft.thumbnailKey, id)
 
-    if (existing.imageKey && existing.imageKey !== gift.imageKey) {
-      try {
-        await repository.deleteImage(existing.imageKey)
-      } catch (error) {
-        logger.warn('旧礼品图片清理失败', { id, imageKey: existing.imageKey })
+    const mutation = await mutateIndex(async (index) => {
+      const existing = index.gifts.find((item) => item.id === id)
+      if (!existing) {
+        throw new HttpError(404, 'GIFT_NOT_FOUND', '礼品不存在')
       }
+
+      const gift = Object.assign({}, draft, {
+        createdAt: Number(existing.createdAt) || now(),
+        updatedAt: now()
+      })
+      return {
+        changed: true,
+        gift,
+        previous: existing,
+        gifts: [gift].concat(index.gifts.filter((item) => item.id !== id))
+      }
+    })
+
+    const existing = mutation.previous
+    const gift = mutation.gift
+    if (existing.imageKey && existing.imageKey !== gift.imageKey) {
+      repository.deleteImage(existing.imageKey).catch((error) => {
+        logger.warn('旧礼品图片清理失败', { id, imageKey: existing.imageKey, error })
+      })
     }
     if (existing.thumbnailKey && existing.thumbnailKey !== gift.thumbnailKey && existing.thumbnailKey !== existing.imageKey) {
-      try {
-        await repository.deleteImage(existing.thumbnailKey)
-      } catch (error) {
-        logger.warn('旧礼品缩略图清理失败', { id, imageKey: existing.thumbnailKey })
-      }
+      repository.deleteImage(existing.thumbnailKey).catch((error) => {
+        logger.warn('旧礼品缩略图清理失败', { id, imageKey: existing.thumbnailKey, error })
+      })
     }
 
-    return success(await presentGift(gift))
+    return success(await presentGift(gift, mutation.index.gifts.length))
   }
 
   async function deleteGift(id) {
-    const existing = await repository.getGift(id)
+    const mutation = await mutateIndex(async (index) => {
+      const existing = index.gifts.find((item) => item.id === id)
+      if (!existing) {
+        throw new HttpError(404, 'GIFT_NOT_FOUND', '礼品不存在')
+      }
 
-    if (!existing) {
-      throw new HttpError(404, 'GIFT_NOT_FOUND', '礼品不存在')
-    }
-
-    await repository.deleteGift(id)
-    const gifts = await getIndex()
-    await saveIndex(gifts.filter((item) => item.id !== id))
+      return {
+        changed: true,
+        previous: existing,
+        gifts: index.gifts.filter((item) => item.id !== id)
+      }
+    })
+    const existing = mutation.previous
 
     if (existing.imageKey) {
-      try {
-        await repository.deleteImage(existing.imageKey)
-      } catch (error) {
-        logger.warn('礼品图片清理失败', { id, imageKey: existing.imageKey })
-      }
+      repository.deleteImage(existing.imageKey).catch((error) => {
+        logger.warn('礼品图片清理失败', { id, imageKey: existing.imageKey, error })
+      })
     }
     if (existing.thumbnailKey && existing.thumbnailKey !== existing.imageKey) {
-      try {
-        await repository.deleteImage(existing.thumbnailKey)
-      } catch (error) {
-        logger.warn('礼品缩略图清理失败', { id, imageKey: existing.thumbnailKey })
-      }
+      repository.deleteImage(existing.thumbnailKey).catch((error) => {
+        logger.warn('礼品缩略图清理失败', { id, imageKey: existing.thumbnailKey, error })
+      })
     }
 
-    return success({ id })
+    return success({ id, total: mutation.index.gifts.length })
   }
 
-  async function createUpload(event) {
-    const body = parseBody(event)
+  function createUploadDraft(event) {
+    const body = bodyOf(event)
     const giftId = validateGiftId(body.giftId)
     const contentType = String(body.contentType || '').toLowerCase()
     const size = Number(body.size)
@@ -350,7 +556,6 @@ function createApp({
     if (!extension) {
       throw new HttpError(400, 'INVALID_IMAGE_TYPE', '图片格式不受支持')
     }
-
     if (!Number.isFinite(size) || size <= 0 || size > config.maxImageBytes) {
       throw new HttpError(400, 'IMAGE_TOO_LARGE', '图片大小不能超过 8MB')
     }
@@ -359,31 +564,54 @@ function createApp({
     const objectPrefix = asset === 'thumbnail' ? 'thumbnails' : 'images'
     const imageKey = config.cosPrefix + '/' + objectPrefix + '/' + giftId + '/' +
       now() + '_' + randomBytes(8) + '.' + extension
-    const uploadUrl = await repository.getUploadUrl(
-      imageKey,
-      config.uploadUrlTtlSeconds
-    )
 
+    return { contentType, giftId, imageKey, size }
+  }
+
+  async function createFormUpload(event) {
+    const upload = createUploadDraft(event)
+    const signed = repository.getFormUpload(
+      upload.imageKey,
+      upload.contentType,
+      upload.size,
+      config.uploadUrlTtlSeconds,
+      now()
+    )
+    return success(Object.assign({}, signed, { contentType: upload.contentType }))
+  }
+
+  async function createLegacyUpload(event) {
+    if (!config.legacyPutUploadUntil || now() > config.legacyPutUploadUntil) {
+      throw new HttpError(410, 'LEGACY_UPLOAD_DISABLED', '旧版图片上传已停用，请更新小程序')
+    }
+
+    const upload = createUploadDraft(event)
+    logger.warn('旧版预签名 PUT 上传仍在兼容窗口内使用', {
+      imageKey: upload.imageKey,
+      expiresAt: config.legacyPutUploadUntil
+    })
+    const uploadUrl = await repository.getUploadUrl(upload.imageKey, config.uploadUrlTtlSeconds)
     return success({
-      imageKey,
+      imageKey: upload.imageKey,
       uploadUrl,
-      contentType,
+      contentType: upload.contentType,
       expiresAt: now() + config.uploadUrlTtlSeconds * 1000
     })
   }
 
   async function deleteOrphan(event) {
-    const body = parseBody(event)
+    const body = bodyOf(event)
     const imageKey = String(body.imageKey || '')
 
     if (!repository.isImageKey(imageKey)) {
       throw new HttpError(400, 'INVALID_IMAGE_KEY', '图片路径无效')
     }
 
-    const match = imageKey.match(/\/images\/(gift_[A-Za-z0-9_-]{8,72})\//)
-    const gift = match ? await repository.getGift(match[1]) : null
-
-    if (gift && gift.imageKey === imageKey) {
+    const index = await ensureIndex()
+    const inUse = index.gifts.some((gift) =>
+      gift.imageKey === imageKey || gift.thumbnailKey === imageKey
+    )
+    if (inUse) {
       throw new HttpError(409, 'IMAGE_IN_USE', '图片仍被礼品使用')
     }
 
@@ -391,11 +619,61 @@ function createApp({
     return success({ imageKey })
   }
 
+  async function cleanupOrphanImages() {
+    return withIndexLock(async () => {
+      const state = await readIndex()
+      let index = state.index
+      if (state.needsMigration) {
+        index = Object.assign({}, index, {
+          revision: Math.max(1, index.revision),
+          updatedAt: now()
+        })
+        await repository.putIndex(index)
+      }
+
+      const referenced = new Set()
+      for (const gift of index.gifts) {
+        if (gift.imageKey) referenced.add(gift.imageKey)
+        if (gift.thumbnailKey) referenced.add(gift.thumbnailKey)
+      }
+      const cutoff = now() - (config.orphanGraceMs || 24 * 60 * 60 * 1000)
+      const objects = await repository.listImageObjects()
+      const candidates = objects
+        .filter((item) => item.lastModified && item.lastModified <= cutoff && !referenced.has(item.key))
+        .slice(0, config.orphanCleanupBatchSize || 200)
+      let deleted = 0
+      let failed = 0
+
+      for (const item of candidates) {
+        try {
+          await repository.deleteImage(item.key)
+          deleted += 1
+        } catch (error) {
+          failed += 1
+          logger.warn('孤儿图片定时清理失败', { imageKey: item.key, error })
+        }
+      }
+
+      const result = {
+        scanned: objects.length,
+        candidates: candidates.length,
+        deleted,
+        failed
+      }
+      logger.info('孤儿图片定时清理完成', result)
+      return result
+    })
+  }
+
   return async function handle(event = {}) {
-    const method = String(event.httpMethod || 'GET').toUpperCase()
+    const method = String(event.httpMethod || '').toUpperCase()
     const path = normalizePath(event.path)
 
     try {
+      if (!method && event.Type === 'Timer' && event.TriggerName === config.cleanupTimerName) {
+        return await cleanupOrphanImages()
+      }
+
       if (method === 'GET' && path === '/health') {
         return success({ status: 'ok' })
       }
@@ -409,7 +687,6 @@ function createApp({
       if (method === 'GET' && path === '/gifts') {
         return await listGifts(event)
       }
-
       if (method === 'POST' && path === '/gifts') {
         return await createGift(event)
       }
@@ -421,19 +698,24 @@ function createApp({
       if (giftMatch && method === 'DELETE') {
         return await deleteGift(validateGiftId(giftMatch[1]))
       }
+
       const imageMatch = path.match(/^\/gifts\/([^/]+)\/image$/)
       if (imageMatch && method === 'GET') {
-        const gift = await repository.getGift(validateGiftId(imageMatch[1]))
+        const id = validateGiftId(imageMatch[1])
+        const index = await ensureIndex()
+        const gift = index.gifts.find((item) => item.id === id)
         if (!gift || !gift.imageKey) {
           throw new HttpError(404, 'IMAGE_NOT_FOUND', '礼品图片不存在')
         }
         return success({ imageUrl: await repository.getDownloadUrl(gift.imageKey) })
       }
 
-      if (method === 'POST' && path === '/uploads/presign') {
-        return await createUpload(event)
+      if (method === 'POST' && path === '/uploads/form-policy') {
+        return await createFormUpload(event)
       }
-
+      if (method === 'POST' && path === '/uploads/presign') {
+        return await createLegacyUpload(event)
+      }
       if (method === 'DELETE' && path === '/uploads/orphan') {
         return await deleteOrphan(event)
       }
@@ -446,7 +728,7 @@ function createApp({
             code: error.code,
             message: error.message
           }
-        })
+        }, error.headers)
       }
 
       logger.error('礼品 API 未处理异常', error)
@@ -462,5 +744,6 @@ function createApp({
 
 module.exports = {
   HttpError,
+  compareGifts,
   createApp
 }

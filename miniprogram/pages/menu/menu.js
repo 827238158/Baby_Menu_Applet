@@ -8,6 +8,9 @@ const OPTION_TYPE_TEXT = 'text'
 const CUSTOM_NAME_OPTION_ID = 'customName'
 const CUSTOM_REMARK_OPTION_ID = 'customRemark'
 const MULTI_NAME_PATTERN = /[、,，;；/\r\n]/
+const CART_KEY_VERSION = 'v2:'
+const MAX_CART_QUANTITY = 99
+const SHEET_CLOSE_DURATION = 240
 
 function normalizeChoice(choice) {
   if (typeof choice === 'string') {
@@ -89,10 +92,6 @@ function normalizeCategories(categories) {
   })
 }
 
-function getDishCount(categories) {
-  return categories.reduce((sum, category) => sum + (category.items || []).length, 0)
-}
-
 function getPageStyle(shop) {
   if (!shop.pageBackgroundImage) {
     return ''
@@ -120,7 +119,6 @@ Page({
     shop: menuData.shop,
     pageStyle: getPageStyle(menuData.shop),
     categories: normalizedCategories,
-    dishCount: getDishCount(normalizedCategories),
     activeCategoryId: '',
     activeItems: [],
     selectedItems: [],
@@ -128,8 +126,11 @@ Page({
     selectedTotal: '0',
     selectedSummaryText: '还未选择菜品',
     cartVisible: false,
+    cartClosing: false,
+    cartMotionClass: '',
     cartRemark: '',
     detailVisible: false,
+    detailClosing: false,
     currentItem: null,
     optionSelections: {},
     optionNotice: '',
@@ -140,6 +141,9 @@ Page({
   },
 
   onLoad() {
+    this.quantityMotionSequence = 0
+    this.cartCloseTimer = null
+    this.detailCloseTimer = null
     const firstCategory = this.data.categories[0] || { id: '', items: [] }
 
     if (wx.showShareMenu) {
@@ -157,8 +161,15 @@ Page({
 
       if (storedSelectedItems.length) {
         this.updateSelected(storedSelectedItems)
+      } else if (this.cartStorageNeedsCleanup && !this.persistSelectedItems([])) {
+        wx.showToast({ title: '购物车保存失败', icon: 'none' })
       }
     })
+  },
+
+  onUnload() {
+    if (this.cartCloseTimer) clearTimeout(this.cartCloseTimer)
+    if (this.detailCloseTimer) clearTimeout(this.detailCloseTimer)
   },
 
   onShareAppMessage() {
@@ -196,16 +207,28 @@ Page({
   },
 
   hideDetail() {
+    if (!this.data.detailVisible || this.data.detailClosing) return
+
+    // 先播放下滑和遮罩淡出，再卸载弹层，保持空间关系连续。
     this.setData({
-      detailVisible: false,
-      currentItem: null,
-      optionSelections: {},
-      optionNotice: '',
-      optionSummaryText: '请选择规格',
-      optionReady: false,
-      detailSheetStyle: '',
+      detailClosing: true,
+      detailSheetStyle: 'transform: translateY(100%); transition: transform ' + SHEET_CLOSE_DURATION + 'ms ease-in;',
       detailDragStartY: 0
     })
+    this.detailCloseTimer = setTimeout(() => {
+      this.detailCloseTimer = null
+      this.setData({
+        detailVisible: false,
+        detailClosing: false,
+        currentItem: null,
+        optionSelections: {},
+        optionNotice: '',
+        optionSummaryText: '请选择规格',
+        optionReady: false,
+        detailSheetStyle: '',
+        detailDragStartY: 0
+      })
+    }, SHEET_CLOSE_DURATION)
   },
 
   addDish(event) {
@@ -232,18 +255,28 @@ Page({
       return
     }
 
-    this.setData({
-      cartVisible: !this.data.cartVisible
-    })
+    if (this.data.cartVisible) {
+      this.hideCartPanel()
+      return
+    }
+
+    if (this.cartCloseTimer) clearTimeout(this.cartCloseTimer)
+    this.setData({ cartVisible: true, cartClosing: false })
   },
 
   hideCartPanel() {
-    this.setData({
-      cartVisible: false
-    })
+    if (!this.data.cartVisible || this.data.cartClosing) return
+
+    this.setData({ cartClosing: true })
+    this.cartCloseTimer = setTimeout(() => {
+      this.cartCloseTimer = null
+      this.setData({ cartVisible: false, cartClosing: false })
+    }, SHEET_CLOSE_DURATION)
   },
 
   confirmAddDish() {
+    if (this.data.detailClosing) return
+
     const item = this.data.currentItem
 
     if (!item) {
@@ -300,6 +333,14 @@ Page({
 
   increaseCartItem(event) {
     const selectionKey = event.currentTarget.dataset.key
+    const target = this.data.selectedItems.find((item) => item.selectionKey === selectionKey)
+
+    if (!target || target.quantity >= MAX_CART_QUANTITY) {
+      if (target) {
+        wx.showToast({ title: '每项最多 99 份', icon: 'none' })
+      }
+      return
+    }
     const selectedItems = this.data.selectedItems.map((item) => {
       if (item.selectionKey !== selectionKey) {
         return item
@@ -310,11 +351,18 @@ Page({
       })
     })
 
-    this.updateSelected(selectedItems)
+    this.updateSelected(selectedItems, {
+      selectionKey,
+      dishId: target.id
+    })
   },
 
   decreaseCartItem(event) {
     const selectionKey = event.currentTarget.dataset.key
+    const target = this.data.selectedItems.find((item) => item.selectionKey === selectionKey)
+
+    if (!target) return
+
     const selectedItems = this.data.selectedItems
       .map((item) => {
         if (item.selectionKey !== selectionKey) {
@@ -327,7 +375,10 @@ Page({
       })
       .filter((item) => item.quantity > 0)
 
-    this.updateSelected(selectedItems)
+    this.updateSelected(selectedItems, {
+      selectionKey,
+      dishId: target.id
+    })
   },
 
   copySelectedMenu() {
@@ -428,6 +479,11 @@ Page({
   openDetail(item, optionSelections) {
     const normalizedSelections = optionSelections || this.getDefaultOptionSelections(item)
 
+    if (this.detailCloseTimer) {
+      clearTimeout(this.detailCloseTimer)
+      this.detailCloseTimer = null
+    }
+
     this.setData({
       currentItem: this.prepareItemForDetail(item, normalizedSelections),
       optionSelections: normalizedSelections,
@@ -436,6 +492,7 @@ Page({
       optionReady: this.areRequiredOptionsSelected(item, normalizedSelections),
       detailSheetStyle: '',
       detailDragStartY: 0,
+      detailClosing: false,
       detailVisible: true
     })
   },
@@ -585,11 +642,26 @@ Page({
   },
 
   addDishWithSelections(item, optionSelections) {
-    const selectedItems = this.mergeSelectedDish(item, optionSelections)
-    const selectedKey = this.getSelectionKey(item, optionSelections)
+    const normalizedSelections = this.normalizeOptionSelections(item, optionSelections)
+    if (!normalizedSelections) {
+      wx.showToast({ title: '购物车数据无效', icon: 'none' })
+      return
+    }
+
+    const selectedKey = this.getSelectionKey(item, normalizedSelections)
+    const current = this.data.selectedItems.find((dish) => dish.selectionKey === selectedKey)
+    if (current && current.quantity >= MAX_CART_QUANTITY) {
+      wx.showToast({ title: '每项最多 99 份', icon: 'none' })
+      return
+    }
+
+    const selectedItems = this.mergeSelectedDish(item, normalizedSelections)
     const selectedDish = selectedItems.find((dish) => dish.selectionKey === selectedKey)
 
-    this.updateSelected(selectedItems)
+    if (!this.updateSelected(selectedItems, {
+      selectionKey: selectedKey,
+      dishId: item.id
+    })) return
 
     wx.showToast({
       title: selectedDish.quantity > 1 ? '已加入 ' + selectedDish.quantity + ' 份' : '已加入购物车',
@@ -597,28 +669,63 @@ Page({
     })
   },
 
-  updateSelected(selectedItems) {
-    const normalizedItems = selectedItems.map((item) => {
-      const price = Number(item.price)
-      const quantity = Number(item.quantity) || 0
-      const itemTotal = Number.isNaN(price) ? 0 : price * quantity
+  updateSelected(selectedItems, motionTarget) {
+    let quantityMotionClass = ''
+    if (motionTarget) {
+      this.quantityMotionSequence = (this.quantityMotionSequence || 0) + 1
+      quantityMotionClass = this.quantityMotionSequence % 2
+        ? 'quantity-pop-a'
+        : 'quantity-pop-b'
+    }
+    const normalizedItems = []
+    for (const item of selectedItems) {
+      const dish = this.findDish(item.id)
+      const quantity = item.quantity
+      const optionSelections = dish
+        ? this.normalizeOptionSelections(dish, item.optionSelections || {})
+        : null
 
-      return Object.assign({}, item, {
-        image: item.image || FALLBACK_IMAGE,
-        itemTotal: String(itemTotal)
+      if (!dish || !Number.isFinite(quantity) || !Number.isInteger(quantity) || quantity < 1 || quantity > MAX_CART_QUANTITY || !optionSelections) {
+        wx.showToast({ title: '购物车数据无效', icon: 'none' })
+        return false
+      }
+
+      const price = Number(dish.price)
+      const itemTotal = Number.isFinite(price) ? price * quantity : 0
+
+      const selectionKey = this.getSelectionKey(dish, optionSelections)
+      normalizedItems.push({
+        id: dish.id,
+        selectionKey,
+        name: dish.name,
+        image: dish.image || FALLBACK_IMAGE,
+        price: dish.price,
+        optionSelections,
+        optionText: this.getOptionText(dish, optionSelections),
+        quantity,
+        itemTotal: String(itemTotal),
+        quantityMotionClass: motionTarget && motionTarget.selectionKey === selectionKey
+          ? quantityMotionClass
+          : ''
       })
-    })
+    }
     const total = normalizedItems.reduce((sum, item) => {
       const price = Number(item.price)
-      const quantity = Number(item.quantity) || 0
-      return Number.isNaN(price) ? sum : sum + price * quantity
+      return Number.isFinite(price) ? sum + price * item.quantity : sum
     }, 0)
     const selectedCount = normalizedItems.reduce((sum, item) => sum + item.quantity, 0)
     const selectedSummaryText = this.getSelectedSummary(normalizedItems)
-    const categories = this.getCategoriesWithCartQuantities(normalizedItems)
+    const categories = this.getCategoriesWithCartQuantities(
+      normalizedItems,
+      motionTarget && motionTarget.dishId,
+      quantityMotionClass
+    )
     const activeCategory = categories.find((category) => category.id === this.data.activeCategoryId)
 
-    this.persistSelectedItems(normalizedItems)
+    if (!this.persistSelectedItems(normalizedItems)) {
+      wx.showToast({ title: '购物车保存失败', icon: 'none' })
+      return false
+    }
 
     this.setData({
       selectedItems: normalizedItems,
@@ -627,13 +734,17 @@ Page({
       selectedSummaryText,
       categories,
       activeItems: activeCategory ? activeCategory.items : [],
-      cartVisible: normalizedItems.length ? this.data.cartVisible : false
+      cartVisible: normalizedItems.length ? this.data.cartVisible : false,
+      cartClosing: normalizedItems.length ? this.data.cartClosing : false,
+      cartMotionClass: quantityMotionClass
     })
+    return true
   },
 
   mergeSelectedDish(item, optionSelections) {
     const selectedItems = this.data.selectedItems.slice()
-    const selectionKey = this.getSelectionKey(item, optionSelections)
+    const normalizedSelections = this.normalizeOptionSelections(item, optionSelections)
+    const selectionKey = this.getSelectionKey(item, normalizedSelections)
     const selectedIndex = selectedItems.findIndex((dish) => dish.selectionKey === selectionKey)
 
     if (selectedIndex >= 0) {
@@ -650,13 +761,15 @@ Page({
       name: item.name,
       image: item.image || FALLBACK_IMAGE,
       price: item.price,
-      optionText: this.getOptionText(item, optionSelections),
+      optionSelections: normalizedSelections,
+      optionText: this.getOptionText(item, normalizedSelections),
       quantity: 1
     })
   },
 
   getStoredSelectedItems() {
     let storedItems = []
+    this.cartStorageNeedsCleanup = false
 
     try {
       storedItems = wx.getStorageSync(CART_STORAGE_KEY)
@@ -665,33 +778,44 @@ Page({
     }
 
     if (!Array.isArray(storedItems)) {
+      this.cartStorageNeedsCleanup = Boolean(storedItems)
       return []
     }
 
-    return storedItems
+    const normalizedItems = storedItems
       .map((storedItem) => this.normalizeStoredCartItem(storedItem))
       .filter(Boolean)
+    this.cartStorageNeedsCleanup = storedItems.length > 0 && normalizedItems.length === 0
+    return normalizedItems
   },
 
   normalizeStoredCartItem(storedItem) {
-    if (!storedItem || !storedItem.id || !storedItem.selectionKey) {
+    if (!storedItem || !storedItem.id) {
       return null
     }
 
     const dish = this.findDish(storedItem.id)
-    const quantity = Number(storedItem.quantity) || 0
+    const quantity = storedItem.quantity
 
-    if (!dish || quantity <= 0 || storedItem.selectionKey.indexOf(dish.id + '|') !== 0) {
+    if (!dish || !Number.isFinite(quantity) || !Number.isInteger(quantity) || quantity < 1 || quantity > MAX_CART_QUANTITY) {
       return null
     }
 
+    const sourceSelections = storedItem.optionSelections && typeof storedItem.optionSelections === 'object'
+      ? storedItem.optionSelections
+      : this.parseLegacyOptionSelections(dish, storedItem.selectionKey)
+    const optionSelections = this.normalizeOptionSelections(dish, sourceSelections)
+
+    if (!optionSelections) return null
+
     return {
       id: dish.id,
-      selectionKey: storedItem.selectionKey,
+      selectionKey: this.getSelectionKey(dish, optionSelections),
       name: dish.name,
       image: dish.image || FALLBACK_IMAGE,
       price: dish.price,
-      optionText: typeof storedItem.optionText === 'string' ? storedItem.optionText : '',
+      optionSelections,
+      optionText: this.getOptionText(dish, optionSelections),
       quantity
     }
   },
@@ -700,7 +824,7 @@ Page({
     try {
       if (!selectedItems.length) {
         wx.removeStorageSync(CART_STORAGE_KEY)
-        return
+        return true
       }
 
       wx.setStorageSync(CART_STORAGE_KEY, selectedItems.map((item) => ({
@@ -709,27 +833,78 @@ Page({
         name: item.name,
         image: item.image || FALLBACK_IMAGE,
         price: item.price,
-        optionText: item.optionText || '',
+        optionSelections: item.optionSelections || {},
         quantity: item.quantity
       })))
-    } catch (error) {}
+      return true
+    } catch (error) {
+      return false
+    }
   },
 
   getSelectionKey(item, optionSelections) {
-    const selectedOptionIds = (item.options || [])
-      .map((option) => {
+    const selectedOptionIds = (item.options || []).map((option) => {
         const value = option.type === OPTION_TYPE_TEXT
           ? this.getTextOptionValue(optionSelections, option.id)
           : (optionSelections[option.id] || '')
 
-        return option.id + ':' + value
+        return [option.id, value]
       })
-      .join('|')
 
-    return item.id + '|' + selectedOptionIds
+    return CART_KEY_VERSION + JSON.stringify([item.id, selectedOptionIds])
   },
 
-  getCategoriesWithCartQuantities(selectedItems) {
+  normalizeOptionSelections(item, sourceSelections) {
+    if (!sourceSelections || typeof sourceSelections !== 'object') return null
+
+    const validOptionIds = new Set((item.options || []).map((option) => option.id))
+    if (Object.keys(sourceSelections).some((optionId) => !validOptionIds.has(optionId))) {
+      return null
+    }
+
+    const normalized = {}
+    for (const option of item.options || []) {
+      if (option.type === OPTION_TYPE_TEXT) {
+        const value = this.getTextOptionValue(sourceSelections, option.id)
+        if (value.length > option.maxlength || (option.required && !value)) return null
+        normalized[option.id] = value
+        continue
+      }
+
+      const value = typeof sourceSelections[option.id] === 'string'
+        ? sourceSelections[option.id]
+        : ''
+      if (option.required && !value) return null
+      if (value && !(option.choices || []).some((choice) => choice.id === value)) return null
+      normalized[option.id] = value
+    }
+
+    if (this.getOptionValidationNotice(item, normalized)) return null
+    return normalized
+  },
+
+  parseLegacyOptionSelections(item, selectionKey) {
+    if (typeof selectionKey !== 'string' || selectionKey.indexOf(item.id + '|') !== 0) {
+      return null
+    }
+
+    const tail = selectionKey.slice(item.id.length + 1)
+    const options = item.options || []
+    if (!options.length) return tail ? null : {}
+
+    const parts = tail.split('|')
+    if (parts.length !== options.length) return null
+
+    const selections = {}
+    for (let index = 0; index < options.length; index += 1) {
+      const prefix = options[index].id + ':'
+      if (parts[index].indexOf(prefix) !== 0) return null
+      selections[options[index].id] = parts[index].slice(prefix.length)
+    }
+    return selections
+  },
+
+  getCategoriesWithCartQuantities(selectedItems, motionDishId, quantityMotionClass) {
     const quantityMap = selectedItems.reduce((map, item) => {
       map[item.id] = (map[item.id] || 0) + item.quantity
       return map
@@ -738,7 +913,8 @@ Page({
     return this.data.categories.map((category) => Object.assign({}, category, {
       items: (category.items || []).map((item) => Object.assign({}, item, {
         cartQuantity: quantityMap[item.id] || 0,
-        directSelectionKey: this.getSelectionKey(item, {})
+        directSelectionKey: this.getSelectionKey(item, {}),
+        quantityMotionClass: item.id === motionDishId ? quantityMotionClass : ''
       }))
     }))
   },

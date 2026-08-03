@@ -8,6 +8,7 @@ const giftApiModule = require('../miniprogram/services/gift-api.js')
 function createWxMock(handler, options = {}) {
   const storage = new Map()
   const requests = []
+  const uploads = []
 
   if (options.session) {
     storage.set(giftApiModule.SESSION_STORAGE_KEY, options.session)
@@ -15,6 +16,7 @@ function createWxMock(handler, options = {}) {
 
   return {
     requests,
+    uploads,
     storage,
     getStorageSync(key) {
       return storage.get(key)
@@ -32,14 +34,23 @@ function createWxMock(handler, options = {}) {
       requests.push(options)
       handler(options)
     },
+    uploadFile(options) {
+      uploads.push(options)
+      if (options.uploadUrl) {
+        throw new Error('uploadFile 参数异常')
+      }
+      if (typeof options.success === 'function') {
+        options.success({
+          statusCode: options.failUpload ? 503 : 204,
+          data: ''
+        })
+      }
+    },
     getFileSystemManager() {
       return {
         getFileInfo({ success }) {
           success({ size: options.fileSize || 1024 })
         },
-        readFile({ success }) {
-          success({ data: new ArrayBuffer(16) })
-        }
       }
     },
     getImageInfo({ success }) {
@@ -99,26 +110,28 @@ test('列表请求遇到 401 时清理旧令牌并自动登录重试一次', asy
   )
 })
 
-test('图片通过预签名 PUT 直接上传 COS', async () => {
+test('图片通过受约束的 POST Object 表单流式上传 COS', async () => {
   const imageKey = 'gift-folder/images/gift_12345678/test.jpg'
   const wxMock = createWxMock((options) => {
-    if (options.url.endsWith('/uploads/presign')) {
+    if (options.url.endsWith('/uploads/form-policy')) {
       options.success({
         statusCode: 200,
         data: {
           data: {
             imageKey,
-            uploadUrl: 'https://bucket.cos.example/test.jpg?signed=1',
-            contentType: 'image/jpeg'
+            uploadUrl: 'https://bucket.cos.example/',
+            contentType: 'image/jpeg',
+            formData: {
+              key: imageKey,
+              policy: 'signed-policy',
+              'Content-Type': 'image/jpeg'
+            }
           }
         }
       })
       return
     }
 
-    if (options.method === 'PUT') {
-      options.success({ statusCode: 200, data: '' })
-    }
   }, {
     session: validSession()
   })
@@ -131,34 +144,41 @@ test('图片通过预签名 PUT 直接上传 COS', async () => {
   )
 
   assert.equal(result, imageKey)
-  assert.equal(wxMock.requests[1].method, 'PUT')
-  assert.equal(wxMock.requests[1].header['content-type'], 'image/jpeg')
-  assert.ok(wxMock.requests[1].data instanceof ArrayBuffer)
+  assert.equal(wxMock.uploads.length, 1)
+  assert.equal(wxMock.uploads[0].filePath, 'wxfile://selected.jpg')
+  assert.equal(wxMock.uploads[0].name, 'file')
+  assert.equal(wxMock.uploads[0].formData.policy, 'signed-policy')
+  assert.equal(wxMock.requests.some((item) => item.method === 'PUT'), false)
 })
 
 test('图片上传失败时返回明确错误，不会继续保存礼品', async () => {
   const wxMock = createWxMock((options) => {
-    if (options.url.endsWith('/uploads/presign')) {
+    if (options.url.endsWith('/uploads/form-policy')) {
       options.success({
         statusCode: 200,
         data: {
           data: {
             imageKey: 'gift-folder/images/gift_12345678/test.jpg',
-            uploadUrl: 'https://bucket.cos.example/test.jpg?signed=1',
-            contentType: 'image/jpeg'
+            uploadUrl: 'https://bucket.cos.example/',
+            contentType: 'image/jpeg',
+            formData: { key: 'gift-folder/images/gift_12345678/test.jpg' }
           }
         }
       })
       return
     }
 
-    options.success({ statusCode: 503, data: '' })
   }, {
     session: validSession()
   })
   const api = giftApiModule.createGiftApi(wxMock, {
     apiBaseUrl: 'https://gift.example'
   })
+
+  wxMock.uploadFile = (options) => {
+    wxMock.uploads.push(options)
+    options.success({ statusCode: 503, data: '' })
+  }
 
   await assert.rejects(
     api.uploadImage('wxfile://selected.jpg', 'gift_12345678'),

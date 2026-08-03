@@ -58,16 +58,32 @@
                 <text class="dish-desc">{{item.desc}}</text>
                 <view class="dish-cart-action">
                   <view wx:if="{{item.options && item.options.length}}" class="quick-action-wrap">
-                    <view class="quick-add-button" data-id="{{item.id}}" bindtap="addDish">+</view>
-                    <text wx:if="{{item.cartQuantity > 0}}" class="dish-cart-count">{{item.cartQuantity}}</text>
+                    <view class="quick-add-button" data-id="{{item.id}}" bindtap="addDish">
+                      <!-- 使用几何线条绘制加号，确保不同设备上始终视觉居中 -->
+                      <view class="menu-plus-icon" aria-hidden="true">
+                        <view class="menu-plus-stroke menu-plus-stroke-horizontal"></view>
+                        <view class="menu-plus-stroke menu-plus-stroke-vertical"></view>
+                      </view>
+                    </view>
+                    <text wx:if="{{item.cartQuantity > 0}}" class="dish-cart-count {{item.quantityMotionClass}}">{{item.cartQuantity}}</text>
                   </view>
                   <view wx:else class="quick-action-wrap">
                     <view wx:if="{{item.cartQuantity > 0}}" class="card-stepper">
                       <button class="stepper-button" data-key="{{item.directSelectionKey}}" bindtap="decreaseCartItem">-</button>
-                      <text class="stepper-count">{{item.cartQuantity}}</text>
-                      <button class="stepper-button stepper-plus" data-id="{{item.id}}" bindtap="addDish">+</button>
+                      <text class="stepper-count {{item.quantityMotionClass}}">{{item.cartQuantity}}</text>
+                      <button class="stepper-button stepper-plus" data-id="{{item.id}}" bindtap="addDish">
+                        <view class="menu-plus-icon" aria-hidden="true">
+                          <view class="menu-plus-stroke menu-plus-stroke-horizontal"></view>
+                          <view class="menu-plus-stroke menu-plus-stroke-vertical"></view>
+                        </view>
+                      </button>
                     </view>
-                    <view wx:else class="quick-add-button" data-id="{{item.id}}" bindtap="addDish">+</view>
+                    <view wx:else class="quick-add-button" data-id="{{item.id}}" bindtap="addDish">
+                      <view class="menu-plus-icon" aria-hidden="true">
+                        <view class="menu-plus-stroke menu-plus-stroke-horizontal"></view>
+                        <view class="menu-plus-stroke menu-plus-stroke-vertical"></view>
+                      </view>
+                    </view>
                   </view>
                 </view>
               </view>
@@ -81,8 +97,8 @@
     </scroll-view>
   </view>
 
-  <view wx:if="{{cartVisible}}" class="cart-mask" bindtap="hideCartPanel">
-    <view class="cart-panel" catchtap="stopTap">
+  <view wx:if="{{cartVisible}}" class="cart-mask {{cartClosing ? 'motion-mask-closing' : ''}}" bindtap="hideCartPanel">
+    <view class="cart-panel {{cartClosing ? 'motion-sheet-closing' : ''}}" catchtap="stopTap">
       <view class="cart-header">
         <text class="cart-title">购物车</text>
       </view>
@@ -106,8 +122,13 @@
             <view class="cart-item-controls">
               <view class="cart-stepper">
                 <button class="stepper-button" data-key="{{item.selectionKey}}" bindtap="decreaseCartItem">-</button>
-                <text class="stepper-count">{{item.quantity}}</text>
-                <button class="stepper-button stepper-plus" data-key="{{item.selectionKey}}" bindtap="increaseCartItem">+</button>
+                <text class="stepper-count {{item.quantityMotionClass}}">{{item.quantity}}</text>
+                <button class="stepper-button stepper-plus" data-key="{{item.selectionKey}}" bindtap="increaseCartItem">
+                  <view class="menu-plus-icon" aria-hidden="true">
+                    <view class="menu-plus-stroke menu-plus-stroke-horizontal"></view>
+                    <view class="menu-plus-stroke menu-plus-stroke-vertical"></view>
+                  </view>
+                </button>
               </view>
             </view>
           </view>
@@ -130,7 +151,7 @@
 
   <view class="cart-bar">
     <view class="cart-entry" bindtap="toggleCartPanel">
-      <view class="cart-icon-wrap">
+      <view class="cart-icon-wrap {{cartMotionClass}}">
         <view class="cart-icon" aria-hidden="true">
           <view class="cart-icon-handle"></view>
           <view class="cart-icon-bag"></view>
@@ -147,7 +168,7 @@
     </view>
   </view>
 
-  <view wx:if="{{detailVisible}}" class="modal-mask" bindtap="hideDetail" catchtouchmove="stopTouchMove">
+  <view wx:if="{{detailVisible}}" class="modal-mask {{detailClosing ? 'motion-mask-closing' : ''}}" bindtap="hideDetail" catchtouchmove="stopTouchMove">
     <view
       class="detail-panel"
       style="{{detailSheetStyle}}"

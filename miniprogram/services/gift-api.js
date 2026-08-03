@@ -205,30 +205,14 @@ function createGiftApi(wxApi, config = giftCloudConfig) {
     })
   }
 
-  function readFile(filePath) {
+  function postImage(upload, filePath) {
     return new Promise((resolve, reject) => {
-      wxApi.getFileSystemManager().readFile({
-        filePath,
-        success(result) {
-          resolve(result.data)
-        },
-        fail() {
-          reject(createApiError('IMAGE_READ_FAILED', '图片读取失败'))
-        }
-      })
-    })
-  }
-
-  function putImage(upload, data) {
-    return new Promise((resolve, reject) => {
-      wxApi.request({
+      wxApi.uploadFile({
         url: upload.uploadUrl,
-        method: 'PUT',
-        data,
+        filePath,
+        name: 'file',
+        formData: upload.formData,
         timeout: 30000,
-        header: {
-          'content-type': upload.contentType
-        },
         success(result) {
           if (result.statusCode >= 200 && result.statusCode < 300) {
             resolve()
@@ -251,7 +235,7 @@ function createGiftApi(wxApi, config = giftCloudConfig) {
     }
 
     const upload = await authorizedRequest({
-      path: '/uploads/presign',
+      path: '/uploads/form-policy',
       method: 'POST',
       data: {
         giftId,
@@ -260,9 +244,7 @@ function createGiftApi(wxApi, config = giftCloudConfig) {
         asset
       }
     })
-    const fileData = await readFile(filePath)
-
-    await putImage(upload, fileData)
+    await postImage(upload, filePath)
     return upload.imageKey
   }
 

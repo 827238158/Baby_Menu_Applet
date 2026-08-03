@@ -22,7 +22,10 @@ function buildApp() {
     bucket: config.cosBucket,
     region: config.cosRegion,
     prefix: config.cosPrefix,
-    downloadUrlTtlSeconds: config.downloadUrlTtlSeconds
+    downloadUrlTtlSeconds: config.downloadUrlTtlSeconds,
+    secretId: process.env.TENCENTCLOUD_SECRETID,
+    secretKey: process.env.TENCENTCLOUD_SECRETKEY,
+    securityToken: process.env.TENCENTCLOUD_SESSIONTOKEN
   })
 
   return createApp({

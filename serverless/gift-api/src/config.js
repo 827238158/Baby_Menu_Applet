@@ -16,6 +16,19 @@ function normalizePrefix(value) {
     .replace(/^\/+|\/+$/g, '') || 'gift-folder'
 }
 
+function parseOptionalTime(value) {
+  const text = String(value || '').trim()
+  if (!text) return 0
+
+  const numeric = Number(text)
+  if (Number.isFinite(numeric) && numeric > 0) {
+    return numeric
+  }
+
+  const timestamp = Date.parse(text)
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
 function loadConfig(env = process.env) {
   const sessionSecret = requireValue(env, 'SESSION_SECRET')
 
@@ -40,11 +53,21 @@ function loadConfig(env = process.env) {
     sessionTtlSeconds: 7 * 24 * 60 * 60,
     uploadUrlTtlSeconds: 5 * 60,
     downloadUrlTtlSeconds: 60 * 60,
-    maxImageBytes: 8 * 1024 * 1024
+    maxImageBytes: 8 * 1024 * 1024,
+    maxJsonBodyBytes: 8 * 1024,
+    loginRateLimitWindowMs: 60 * 1000,
+    loginRateLimitMax: 10,
+    mutationLockLeaseMs: 30 * 1000,
+    mutationLockWaitMs: 2 * 1000,
+    orphanGraceMs: 24 * 60 * 60 * 1000,
+    orphanCleanupBatchSize: 200,
+    cleanupTimerName: 'GiftImageCleanupDaily',
+    legacyPutUploadUntil: parseOptionalTime(env.LEGACY_PUT_UPLOAD_UNTIL)
   }
 }
 
 module.exports = {
   loadConfig,
-  normalizePrefix
+  normalizePrefix,
+  parseOptionalTime
 }

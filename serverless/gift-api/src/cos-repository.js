@@ -1,5 +1,7 @@
 'use strict'
 
+const crypto = require('node:crypto')
+
 function callCos(cos, method, params) {
   return new Promise((resolve, reject) => {
     cos[method](params, (error, data) => {
@@ -14,39 +16,62 @@ function callCos(cos, method, params) {
 }
 
 function isNotFound(error) {
-  return error && (
+  return Boolean(error && (
     error.statusCode === 404 ||
     error.code === 'NoSuchKey' ||
     error.error && error.error.Code === 'NoSuchKey'
-  )
+  ))
 }
 
-function createCosRepository({ cos, bucket, region, prefix, downloadUrlTtlSeconds }) {
+function isAlreadyExists(error) {
+  return Boolean(error && (
+    error.statusCode === 409 ||
+    error.code === 'FileAlreadyExists' ||
+    error.error && error.error.Code === 'FileAlreadyExists'
+  ))
+}
+
+function createCosRepository({
+  cos,
+  bucket,
+  region,
+  prefix,
+  downloadUrlTtlSeconds,
+  secretId,
+  secretKey,
+  securityToken
+}) {
   const giftPrefix = prefix + '/gifts/'
   const imagePrefix = prefix + '/images/'
   const thumbnailPrefix = prefix + '/thumbnails/'
+  const systemPrefix = prefix + '/system/'
   const indexKey = prefix + '/index.json'
+  const mutationLockKey = systemPrefix + 'index.lock'
 
   function giftKey(id) {
     return giftPrefix + id + '.json'
   }
 
-  async function listObjectKeys() {
-    const keys = []
+  async function listObjects(objectPrefix) {
+    const objects = []
     let marker = ''
 
     do {
       const result = await callCos(cos, 'getBucket', {
         Bucket: bucket,
         Region: region,
-        Prefix: giftPrefix,
+        Prefix: objectPrefix,
         Marker: marker,
         MaxKeys: 1000
       })
 
       for (const item of result.Contents || []) {
-        if (item.Key && item.Key.endsWith('.json')) {
-          keys.push(item.Key)
+        if (item.Key) {
+          objects.push({
+            key: item.Key,
+            lastModified: Date.parse(item.LastModified || '') || 0,
+            size: Number(item.Size) || 0
+          })
         }
       }
 
@@ -54,7 +79,7 @@ function createCosRepository({ cos, bucket, region, prefix, downloadUrlTtlSecond
       marker = truncated ? String(result.NextMarker || '') : ''
     } while (marker)
 
-    return keys
+    return objects
   }
 
   async function readJson(key) {
@@ -70,9 +95,9 @@ function createCosRepository({ cos, bucket, region, prefix, downloadUrlTtlSecond
     return JSON.parse(body)
   }
 
-  async function getGift(id) {
+  async function readJsonOrNull(key) {
     try {
-      return await readJson(giftKey(id))
+      return await readJson(key)
     } catch (error) {
       if (isNotFound(error)) {
         return null
@@ -82,55 +107,43 @@ function createCosRepository({ cos, bucket, region, prefix, downloadUrlTtlSecond
   }
 
   async function getIndex() {
-    try {
-      return await readJson(indexKey)
-    } catch (error) {
-      if (isNotFound(error)) {
-        return null
-      }
-      throw error
-    }
+    return readJsonOrNull(indexKey)
   }
 
-  async function listGifts() {
-    const keys = await listObjectKeys()
+  async function listLegacyGifts() {
+    const objects = await listObjects(giftPrefix)
+    const keys = objects
+      .map((item) => item.key)
+      .filter((key) => key.endsWith('.json'))
+
     return Promise.all(keys.map(readJson))
   }
 
-  async function putGift(gift) {
-    await callCos(cos, 'putObject', {
+  async function putJson(key, value, headers = {}) {
+    return callCos(cos, 'putObject', {
       Bucket: bucket,
       Region: region,
-      Key: giftKey(gift.id),
-      Body: JSON.stringify(gift),
-      ContentType: 'application/json; charset=utf-8'
+      Key: key,
+      Body: JSON.stringify(value),
+      ContentType: 'application/json; charset=utf-8',
+      Headers: headers
     })
   }
 
   async function putIndex(index) {
-    await callCos(cos, 'putObject', {
-      Bucket: bucket,
-      Region: region,
-      Key: indexKey,
-      Body: JSON.stringify(index),
-      ContentType: 'application/json; charset=utf-8'
-    })
+    await putJson(indexKey, index)
   }
 
-  async function deleteGift(id) {
-    await callCos(cos, 'deleteObject', {
-      Bucket: bucket,
-      Region: region,
-      Key: giftKey(id)
-    })
-  }
-
-  async function deleteImage(key) {
+  async function deleteObject(key) {
     await callCos(cos, 'deleteObject', {
       Bucket: bucket,
       Region: region,
       Key: key
     })
+  }
+
+  async function deleteImage(key) {
+    await deleteObject(key)
   }
 
   async function getImageInfo(key) {
@@ -175,6 +188,90 @@ function createCosRepository({ cos, bucket, region, prefix, downloadUrlTtlSecond
     return getSignedUrl(key, 'PUT', expires)
   }
 
+  function getFormUpload(key, contentType, size, expires, currentTime) {
+    if (!secretId || !secretKey) {
+      throw new Error('COS POST Object 签名凭据不可用')
+    }
+
+    const startSeconds = Math.floor(currentTime / 1000)
+    const endSeconds = startSeconds + expires
+    const keyTime = startSeconds + ';' + endSeconds
+    const conditions = [
+      { bucket },
+      ['eq', '$key', key],
+      ['eq', '$Content-Type', contentType],
+      ['eq', '$success_action_status', '204'],
+      ['eq', '$x-cos-forbid-overwrite', 'true'],
+      { 'q-sign-algorithm': 'sha1' },
+      { 'q-ak': secretId },
+      { 'q-sign-time': keyTime },
+      ['content-length-range', size, size]
+    ]
+    if (securityToken) {
+      // SCF 临时密钥必须随表单传递，并一并纳入策略精确约束。
+      conditions.push(['eq', '$x-cos-security-token', securityToken])
+    }
+    const policyObject = {
+      expiration: new Date(endSeconds * 1000).toISOString(),
+      conditions
+    }
+    const policyText = JSON.stringify(policyObject)
+    const signKey = crypto.createHmac('sha1', secretKey).update(keyTime).digest('hex')
+    const stringToSign = crypto.createHash('sha1').update(policyText).digest('hex')
+    const signature = crypto.createHmac('sha1', signKey).update(stringToSign).digest('hex')
+    const formData = {
+      key,
+      'Content-Type': contentType,
+      success_action_status: '204',
+      'x-cos-forbid-overwrite': 'true',
+      policy: Buffer.from(policyText, 'utf8').toString('base64'),
+      'q-sign-algorithm': 'sha1',
+      'q-ak': secretId,
+      'q-key-time': keyTime,
+      'q-signature': signature
+    }
+
+    if (securityToken) {
+      formData['x-cos-security-token'] = securityToken
+    }
+
+    return {
+      imageKey: key,
+      uploadUrl: 'https://' + bucket + '.cos.' + region + '.myqcloud.com/',
+      formData,
+      expiresAt: endSeconds * 1000
+    }
+  }
+
+  async function tryAcquireMutationLock(lock) {
+    try {
+      await putJson(mutationLockKey, lock, {
+        'x-cos-forbid-overwrite': 'true'
+      })
+      return true
+    } catch (error) {
+      if (isAlreadyExists(error)) {
+        return false
+      }
+      throw error
+    }
+  }
+
+  async function getMutationLock() {
+    return readJsonOrNull(mutationLockKey)
+  }
+
+  async function releaseMutationLock(owner) {
+    const stored = await getMutationLock()
+
+    if (!stored || stored.owner !== owner) {
+      return false
+    }
+
+    await deleteObject(mutationLockKey)
+    return true
+  }
+
   function isImageKeyForGift(key, id) {
     return typeof key === 'string' &&
       (key.startsWith(imagePrefix + id + '/') || key.startsWith(thumbnailPrefix + id + '/')) &&
@@ -187,22 +284,36 @@ function createCosRepository({ cos, bucket, region, prefix, downloadUrlTtlSecond
       !key.includes('..')
   }
 
+  async function listImageObjects() {
+    const [images, thumbnails] = await Promise.all([
+      listObjects(imagePrefix),
+      listObjects(thumbnailPrefix)
+    ])
+
+    return images.concat(thumbnails)
+  }
+
   return {
-    deleteGift,
     deleteImage,
     getDownloadUrl,
-    getGift,
+    getFormUpload,
     getIndex,
     getImageInfo,
+    getMutationLock,
     getUploadUrl,
     isImageKey,
     isImageKeyForGift,
-    listGifts,
+    isNotFoundError: isNotFound,
+    listImageObjects,
+    listLegacyGifts,
     putIndex,
-    putGift
+    releaseMutationLock,
+    tryAcquireMutationLock
   }
 }
 
 module.exports = {
-  createCosRepository
+  createCosRepository,
+  isAlreadyExists,
+  isNotFound
 }

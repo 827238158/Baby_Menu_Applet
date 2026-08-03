@@ -77,7 +77,7 @@ button::after {
   line-height: 56rpx;
   color: #ffffff;
   background: rgba(34, 31, 30, 0.24);
-  transition: transform 160ms ease, background-color 160ms ease;
+  transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1), background-color 150ms ease-out;
 }
 
 .gift-folder-entry:active {
@@ -127,17 +127,6 @@ button::after {
   background: #ffffff;
 }
 
-.shop-kicker {
-  align-self: flex-start;
-  padding: 8rpx 14rpx;
-  border: 1rpx solid rgba(255, 255, 255, 0.52);
-  border-radius: 999rpx;
-  font-size: 21rpx;
-  font-weight: 600;
-  line-height: 1;
-  color: rgba(255, 255, 255, 0.9);
-}
-
 .shop-name {
   font-size: 44rpx;
   font-weight: 800;
@@ -148,12 +137,6 @@ button::after {
 .shop-subtitle {
   font-size: 24rpx;
   line-height: 1.45;
-  color: rgba(255, 255, 255, 0.88);
-}
-
-.shop-stats {
-  font-size: 23rpx;
-  line-height: 1.35;
   color: rgba(255, 255, 255, 0.88);
 }
 
@@ -191,7 +174,7 @@ button::after {
   color: #847a73;
   background: rgba(255, 255, 255, 0.72);
   box-shadow: 0 8rpx 18rpx rgba(112, 89, 83, 0.05);
-  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  transition: background-color 180ms ease-out, color 180ms ease-out, transform 150ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease-out;
 }
 
 .category-item-active {
@@ -229,18 +212,6 @@ button::after {
   background: #f4f3f1;
 }
 
-.category-count {
-  display: block;
-  overflow: hidden;
-  max-width: 100%;
-  font-size: 20rpx;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: inherit;
-  opacity: 0.74;
-}
-
 .dish-list {
   flex: 1;
   min-width: 0;
@@ -257,7 +228,8 @@ button::after {
   border-radius: 24rpx;
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 12rpx 28rpx rgba(109, 84, 78, 0.08);
-  transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+  animation: content-rise-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease-out, background-color 180ms ease-out;
 }
 
 .dish-card:active {
@@ -369,42 +341,6 @@ button::after {
   background: #f3f2ef;
 }
 
-.option-hint {
-  align-self: flex-start;
-  box-sizing: border-box;
-  max-width: 100%;
-  margin-top: 12rpx;
-  padding: 7rpx 12rpx;
-  border-radius: 8rpx;
-  font-size: 20rpx;
-  line-height: 1.2;
-  color: #9a7a63;
-  background: #fff5ed;
-}
-
-.dish-option-preview {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6rpx;
-  overflow: hidden;
-  max-height: 42rpx;
-  margin-top: 9rpx;
-}
-
-.dish-option-chip {
-  box-sizing: border-box;
-  max-width: 112rpx;
-  padding: 5rpx 9rpx;
-  border: 1rpx solid #efe1dc;
-  border-radius: 999rpx;
-  font-size: 18rpx;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #9a7a73;
-  background: rgba(255, 255, 255, 0.92);
-}
-
 .dish-cart-action {
   display: flex;
   width: 100%;
@@ -445,9 +381,8 @@ button::after {
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
+  overflow: hidden;
   border-radius: 999rpx;
-  font-weight: 700;
-  text-align: center;
   color: #ffffff;
   background: #d97986;
   width: 46rpx;
@@ -455,10 +390,35 @@ button::after {
   min-width: 46rpx;
   min-height: 46rpx;
   padding: 0;
-  font-size: 30rpx;
-  line-height: 46rpx;
   box-shadow: 0 8rpx 18rpx rgba(217, 121, 134, 0.24);
-  transition: transform 160ms ease, background-color 160ms ease, opacity 160ms ease, box-shadow 160ms ease;
+  transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1), background-color 150ms ease-out, opacity 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+.menu-plus-icon {
+  position: relative;
+  flex: 0 0 auto;
+  width: 20rpx;
+  height: 20rpx;
+  pointer-events: none;
+}
+
+.menu-plus-stroke {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 999rpx;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+
+.menu-plus-stroke-horizontal {
+  width: 100%;
+  height: 4rpx;
+}
+
+.menu-plus-stroke-vertical {
+  width: 4rpx;
+  height: 100%;
 }
 
 .quick-add-button:active {
@@ -480,7 +440,8 @@ button::after {
   height: 46rpx;
   gap: 5rpx;
   justify-content: flex-end;
-  transition: opacity 160ms ease, transform 160ms ease;
+  animation: control-reveal 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: opacity 160ms ease-out, transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .stepper-button {
@@ -497,7 +458,7 @@ button::after {
   text-align: center;
   color: #d97986;
   background: #ffffff;
-  transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease;
+  transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1), background-color 150ms ease-out, border-color 150ms ease-out;
 }
 
 .stepper-button:active,
@@ -508,10 +469,18 @@ button::after {
 }
 
 .stepper-plus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-color: #d97986;
   color: #ffffff;
   background: #d97986;
   box-shadow: 0 6rpx 14rpx rgba(217, 121, 134, 0.18);
+}
+
+.stepper-plus .menu-plus-icon {
+  width: 18rpx;
+  height: 18rpx;
 }
 
 .stepper-count {
@@ -521,6 +490,14 @@ button::after {
   line-height: 1;
   text-align: center;
   color: #2d2926;
+}
+
+.quantity-pop-a {
+  animation: quantity-pop-a 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.quantity-pop-b {
+  animation: quantity-pop-b 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .card-stepper .stepper-button {
@@ -571,7 +548,16 @@ button::after {
   border-radius: 30rpx;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 18rpx 48rpx rgba(80, 54, 58, 0.18);
-  animation: sheet-slide-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: sheet-slide-up 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.motion-mask-closing {
+  pointer-events: none;
+  animation: mask-fade-out 220ms ease-in both;
+}
+
+.motion-sheet-closing {
+  animation: sheet-slide-down 240ms ease-in both;
 }
 
 .cart-header {
@@ -744,6 +730,11 @@ button::after {
   align-items: center;
   gap: 14rpx;
   min-width: 0;
+  transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cart-entry:active {
+  transform: scale(0.98);
 }
 
 .cart-icon-wrap {
@@ -758,6 +749,7 @@ button::after {
   color: #ffffff;
   background: #d97986;
   box-shadow: 0 8rpx 18rpx rgba(217, 121, 134, 0.22);
+  transform-origin: center;
 }
 
 .cart-icon {
@@ -875,8 +867,8 @@ button::after {
   border-radius: 36rpx 36rpx 0 0;
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 -18rpx 48rpx rgba(80, 54, 58, 0.18);
-  animation: sheet-slide-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  transition: transform 180ms ease-out;
+  animation: sheet-slide-up 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 240ms ease-out;
 }
 
 .detail-drag-zone {
@@ -960,10 +952,6 @@ button::after {
   color: #847a73;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-}
-
-.detail-tags {
-  margin-top: 18rpx;
 }
 
 .selected-spec-card {
@@ -1144,6 +1132,16 @@ button::after {
   }
 }
 
+@keyframes mask-fade-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
 @keyframes sheet-slide-up {
   from {
     transform: translateY(100%);
@@ -1151,6 +1149,74 @@ button::after {
 
   to {
     transform: translateY(0);
+  }
+}
+
+@keyframes sheet-slide-down {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes content-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12rpx);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes control-reveal {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes quantity-pop-a {
+  0% {
+    opacity: 0.72;
+    transform: translateY(5rpx) scale(0.9);
+  }
+
+  68% {
+    opacity: 1;
+    transform: translateY(-2rpx) scale(1.06);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes quantity-pop-b {
+  0% {
+    opacity: 0.72;
+    transform: translateY(5rpx) scale(0.9);
+  }
+
+  68% {
+    opacity: 1;
+    transform: translateY(-2rpx) scale(1.06);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -1165,6 +1231,30 @@ button::after {
   font-size: 26rpx;
   color: #9b8b87;
   background: rgba(255, 255, 255, 0.72);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dish-card,
+  .card-stepper,
+  .cart-mask,
+  .cart-panel,
+  .modal-mask,
+  .detail-panel,
+  .quantity-pop-a,
+  .quantity-pop-b {
+    animation: none;
+  }
+
+  .gift-folder-entry,
+  .category-item,
+  .dish-card,
+  .quick-add-button,
+  .stepper-button,
+  .card-stepper,
+  .cart-entry,
+  .detail-panel {
+    transition: none;
+  }
 }
 
 @media (max-width: 360px) {
@@ -1205,8 +1295,6 @@ button::after {
     height: 44rpx;
     min-width: 44rpx;
     min-height: 44rpx;
-    font-size: 28rpx;
-    line-height: 44rpx;
   }
 
   .stepper-button {
