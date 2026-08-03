@@ -9,22 +9,56 @@
     <view class="gift-header-overlay"></view>
     <view class="gift-header-copy">
       <text class="gift-header-title">我的礼品夹</text>
-      <text class="gift-header-subtitle">已收藏 {{giftCount}} 件心仪礼品</text>
+      <text wx:if="{{isInitialLoading}}" class="gift-header-subtitle">正在同步礼品夹…</text>
+      <text wx:else class="gift-header-subtitle">已收藏 {{giftCount}} 件心仪礼品</text>
     </view>
   </view>
 
-  <view wx:if="{{gifts.length}}" class="gift-list">
-    <view class="gift-card" wx:for="{{gifts}}" wx:key="id">
+  <view wx:if="{{accessDenied}}" class="access-denied-state">
+    <view class="access-denied-icon">!</view>
+    <text class="access-denied-title">仅限受邀用户使用礼品夹</text>
+    <text class="access-denied-description">当前微信账号不在授权名单中，无法查看或编辑礼品内容。</text>
+    <button class="access-denied-button" bindtap="backToMenu">返回菜单</button>
+  </view>
+
+  <view
+    wx:if="{{!accessDenied && isInitialLoading}}"
+    class="gift-skeleton-list"
+    aria-label="正在加载礼品"
+    aria-busy="true"
+  >
+    <view
+      class="gift-card gift-skeleton-card"
+      wx:for="{{loadingSkeletons}}"
+      wx:key="*this"
+    >
+      <view class="gift-skeleton-image gift-skeleton-block"></view>
+      <view class="gift-skeleton-info">
+        <view class="gift-skeleton-title gift-skeleton-block"></view>
+        <view class="gift-skeleton-line gift-skeleton-line-long gift-skeleton-block"></view>
+        <view class="gift-skeleton-line gift-skeleton-line-short gift-skeleton-block"></view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{!accessDenied && !isInitialLoading && gifts.length}}" class="gift-list">
+    <view
+      class="gift-card {{recentGiftId === item.id ? 'gift-card-emphasis' : ''}} {{removingGiftId === item.id ? 'gift-card-removing' : ''}}"
+      wx:for="{{gifts}}"
+      wx:key="id"
+    >
       <view
         wx:if="{{item.imagePath && item.imageAvailable}}"
         class="gift-image-wrap"
-        data-src="{{item.imagePath}}"
+        data-id="{{item.id}}"
         bindtap="previewImage"
       >
         <image
           class="gift-image"
           src="{{item.imagePath}}"
           mode="aspectFill"
+          lazy-load="{{true}}"
+          fade-in="{{false}}"
           data-id="{{item.id}}"
           binderror="handleImageError"
         ></image>
@@ -51,7 +85,11 @@
     </view>
   </view>
 
-  <view wx:else class="empty-state">
+  <view wx:if="{{!accessDenied && !isInitialLoading && gifts.length && hasMore}}" class="load-more" bindtap="loadMoreGifts">
+    <text>{{isLoadingMore ? '正在加载…' : '继续加载更多礼品'}}</text>
+  </view>
+
+  <view wx:if="{{!accessDenied && !isInitialLoading && !gifts.length}}" class="empty-state">
     <view class="empty-gift-icon" aria-hidden="true">
       <view class="empty-gift-lid"></view>
       <view class="empty-gift-box"></view>
@@ -62,15 +100,19 @@
   </view>
 
   <button
-    wx:if="{{gifts.length}}"
+    wx:if="{{!accessDenied && !isInitialLoading && gifts.length}}"
     class="floating-add-button"
     bindtap="openCreateForm"
     aria-label="收藏新礼品"
   >
-    <text class="floating-add-icon">+</text>
+    <!-- 使用几何线条绘制加号，避免系统字体基线造成视觉偏移 -->
+    <view class="floating-add-icon" aria-hidden="true">
+      <view class="floating-add-stroke floating-add-stroke-horizontal"></view>
+      <view class="floating-add-stroke floating-add-stroke-vertical"></view>
+    </view>
   </button>
 
-  <view wx:if="{{formVisible}}" class="form-mask" catchtouchmove="stopTap">
+  <view wx:if="{{formVisible}}" class="form-mask {{formClosing ? 'motion-mask-closing' : ''}}" bindtap="requestCloseForm" catchtouchmove="stopTap">
     <view class="form-panel" style="{{formSheetStyle}}" catchtap="stopTap" catchtouchmove="stopTap">
       <view
         class="form-drag-zone"
@@ -89,7 +131,7 @@
 
       <scroll-view class="form-scroll" scroll-y enhanced show-scrollbar="{{false}}">
         <view class="form-content">
-          <view class="image-picker" bindtap="chooseImage">
+          <view class="image-picker" bindtap="showImageSourceActions">
             <image
               wx:if="{{form.imagePath}}"
               class="image-picker-preview"
@@ -97,14 +139,19 @@
               mode="aspectFill"
             ></image>
             <view wx:else class="image-picker-empty">
-              <text class="image-picker-plus">+</text>
-              <text class="image-picker-label">从相册选择图片</text>
-              <text class="image-picker-optional">选填</text>
+              <view class="image-picker-plus" aria-hidden="true">
+                <view class="image-picker-plus-stroke image-picker-plus-stroke-horizontal"></view>
+                <view class="image-picker-plus-stroke image-picker-plus-stroke-vertical"></view>
+              </view>
+              <text class="image-picker-label">为礼品添加一张图片</text>
             </view>
-            <view wx:if="{{form.imagePath}}" class="image-picker-actions">
-              <text class="image-change-label">更换图片</text>
-              <button class="image-remove-button" catchtap="removeFormImage">移除</button>
-            </view>
+            <view
+              wx:if="{{form.imagePath}}"
+              class="image-picker-remove"
+              catchtap="confirmRemoveFormImage"
+              aria-role="button"
+              aria-label="移除当前图片"
+            >×</view>
           </view>
 
           <view class="form-field">
@@ -115,6 +162,7 @@
             <input
               class="form-input"
               value="{{form.name}}"
+              disabled="{{isSaving || isDeleting}}"
               placeholder="例如：手工陶瓷杯"
               placeholder-class="form-placeholder"
               maxlength="40"
@@ -131,6 +179,7 @@
             <textarea
               class="form-textarea"
               value="{{form.description}}"
+              disabled="{{isSaving || isDeleting}}"
               placeholder="记录款式、颜色或喜欢它的原因"
               placeholder-class="form-placeholder"
               maxlength="200"
@@ -142,7 +191,14 @@
       </scroll-view>
 
       <view class="form-footer">
-        <button wx:if="{{isEditing}}" class="delete-button" bindtap="confirmDelete">删除</button>
+        <button
+          wx:if="{{isEditing}}"
+          class="delete-button"
+          disabled="{{isSaving || isDeleting}}"
+          bindtap="confirmDelete"
+        >
+          删除
+        </button>
         <button
           class="save-button {{saveDisabled ? 'save-button-disabled' : ''}}"
           disabled="{{saveDisabled}}"
@@ -151,6 +207,13 @@
           保存到礼品夹
         </button>
       </view>
+    </view>
+  </view>
+
+  <view wx:if="{{isPreviewVisible}}" class="image-preview-mask {{previewClosing ? 'image-preview-mask-closing' : ''}}" catchtouchmove="stopTap">
+    <view class="image-preview-panel {{previewClosing ? 'image-preview-panel-closing' : ''}}" catchtap="stopTap">
+      <image class="image-preview-full" src="{{previewImagePath}}" mode="aspectFit" bindtap="closePreview"></image>
+      <button class="image-preview-exit" bindtap="closePreview">点击图片或此处退出</button>
     </view>
   </view>
 </view>

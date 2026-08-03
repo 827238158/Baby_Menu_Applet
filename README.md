@@ -1,6 +1,6 @@
 # 微信小程序展示点餐页
 
-这是一个微信原生小程序项目，用于展示一份可分享的家庭私房菜单。项目当前定位是“可发布展示版”：不包含后端、数据库、登录、支付或真实下单能力，页面里的“加入”和合计只是前端展示效果。
+这是一个微信原生小程序项目，用于展示一份可分享的家庭私房菜单。菜单仍是本地展示功能，不包含支付或真实下单；礼品夹可选接入 SCF + 私有 COS，实现两名授权用户共享礼品。
 
 ## 当前状态
 
@@ -10,8 +10,10 @@
 - 分类配置：`miniprogram/data/category-data.js`
 - 餐品配置：`miniprogram/data/dish-data.js`
 - 项目配置：`project.config.json`
-- 小程序 AppID：当前仍使用测试占位值 `touristappid`
+- 小程序 AppID：已在 `project.config.json` 配置
 - 图片资源：仓库已内置分享图、菜品图、背景图和通用占位图
+- 礼品夹后端：`serverless/gift-api`
+- 礼品夹云端状态：SCF 已部署原图接口；列表加载缩略图，全屏预览按需加载原图，真机功能正常
 
 ## 目录结构
 
@@ -20,6 +22,8 @@
 ├── README.md
 ├── CUSTOMIZATION.md
 ├── project.config.json
+├── serverless
+│   └── gift-api
 └── miniprogram
     ├── app.js
     ├── app.json
@@ -30,7 +34,12 @@
     │   ├── category-data.js
     │   ├── dish-data.js
     │   └── menu-data.js
+    ├── config
+    │   └── gift-cloud.js
+    ├── services
+    │   └── gift-api.js
     ├── pages
+    │   ├── gifts
     │   └── menu
     │       ├── menu.js
     │       ├── menu.json
@@ -77,40 +86,41 @@ node tools\generate-menu-data.js
 1. 打开微信开发者工具。
 2. 选择“导入项目”。
 3. 项目目录选择仓库根目录，也就是包含 `project.config.json` 的目录。
-4. AppID 暂时没有时，可以继续使用当前配置里的 `touristappid` 做开发预览。
+4. 使用 `project.config.json` 中已经配置的小程序 AppID。
 5. 编译后会进入 `pages/menu/menu`。
 
-## 发布前需要处理
+## 配置共享礼品夹
 
-当前 `project.config.json` 仍然是：
+礼品夹云端功能需要先部署 SCF 和私有 COS，完整步骤见：
 
-```json
-"appid": "touristappid"
+```text
+serverless/gift-api/README.md
 ```
 
-正式发布前需要把它替换为真实微信小程序 AppID。替换方式：
-
-1. 在微信开发者工具导入项目时填写真实 AppID。
-2. 或手动编辑 `project.config.json`，把 `touristappid` 改成真实 AppID。
-
-如果后续改用网络图片，需要在微信公众平台配置合法下载域名；继续使用本地图片则不需要。
+部署完成后，把 SCF 函数 URL 填入 `miniprogram/config/gift-cloud.js`。该 URL 不是密钥；OpenID、AppSecret、会话密钥和腾讯云临时凭证都只存在于 SCF 环境中。
 
 ## 测试清单
 
 - 分类按 `category-data.js` 的 `order` 排序。
 - 餐品按 `dish-data.js` 的 `categoryId` 和 `order` 归类展示。
 - 分类切换正常，左侧分类数量显示正确。
-- 点击“详情”可以打开弹窗，点击遮罩或“关闭”可以关闭。
-- 有规格餐品点击“加入”会先打开规格选择，未选必选项不能加入。
-- 无规格餐品点击“加入”会直接加入。
+- 点击餐品图片或文字区可以打开详情弹层，点击遮罩可以关闭。
+- 有规格餐品点击圆形 `+` 会先打开规格选择，未选必选项不能加入。
+- 无规格餐品点击圆形 `+` 会直接加入。
 - 同一餐品不同规格组合会分开显示和计数。
 - 底部已选数量、菜品摘要和模拟合计正确。
-- 分享按钮和右上角转发返回同一个分享标题、页面路径和分享图。
+- 右上角转发和分享到朋友圈使用预设的标题、页面路径和分享图；页面不额外放显式分享按钮。
 - 替换或故意写错菜品图片路径时，页面会显示通用占位图，不影响布局。
+- 礼品夹先完成白名单授权并显示加载骨架；授权成功后再读取云端列表，本地缓存只用于授权后的展示地址复用和网络失败兜底。
+- 未授权微信账号不能查询、新增、编辑或删除礼品。
+- 仅文字、仅图片和图片加文字礼品均可保存。
+- 礼品列表加载缩略图，点击图片进入全屏预览后可以正常加载原图。
+- 礼品列表超过 20 条时触底续载不重复、不跳项，两人并发增删改后总数一致。
 
 ## 技术说明
 
 - 只使用微信原生 WXML、WXSS、JS、JSON。
 - 小程序本身不需要 npm、webpack、Taro、uni-app 或其他编译依赖。
+- `serverless/gift-api` 是独立 Node.js 18 项目，仅在打包 SCF 时安装依赖。
 - 菜单数据生成脚本需要本地 Node.js 调用 Python，并由 Python `openpyxl` 读取 Excel。
-- 目前所有交互状态只存在页面内，刷新后会重置。
+- 菜单和购物车仍是本地状态；礼品夹以私有 COS 为云端数据源。
