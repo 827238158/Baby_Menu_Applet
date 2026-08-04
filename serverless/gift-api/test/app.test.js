@@ -11,6 +11,9 @@ const OPEN_ID = 'openid-authorized-user'
 const GIFT_ID = 'gift_12345678'
 const IMAGE_KEY = 'gift-folder/images/' + GIFT_ID + '/image.jpg'
 const THUMBNAIL_KEY = 'gift-folder/thumbnails/' + GIFT_ID + '/thumbnail.jpg'
+const DECOR_ID = 'decor_12345678'
+const DECOR_IMAGE_KEY = 'gift-folder/decor/images/' + DECOR_ID + '/image.jpg'
+const DECOR_THUMBNAIL_KEY = 'gift-folder/decor/thumbnails/' + DECOR_ID + '/thumbnail.jpg'
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value))
@@ -21,12 +24,17 @@ function createRepository() {
   const deletedImages = []
   const imageInfo = new Map([
     [IMAGE_KEY, { size: 1024, contentType: 'image/jpeg' }],
-    [THUMBNAIL_KEY, { size: 256, contentType: 'image/jpeg' }]
+    [THUMBNAIL_KEY, { size: 256, contentType: 'image/jpeg' }],
+    [DECOR_IMAGE_KEY, { size: 1024, contentType: 'image/jpeg' }],
+    [DECOR_THUMBNAIL_KEY, { size: 256, contentType: 'image/jpeg' }]
   ])
   let index = null
   let lock = null
+  let decorIndex = null
+  let decorLock = null
   let putIndexDelay = 0
   let imageObjects = []
+  let decorImageObjects = []
 
   return {
     deletedImages,
@@ -45,6 +53,15 @@ function createRepository() {
     set imageObjects(value) {
       imageObjects = clone(value)
     },
+    get decorIndex() {
+      return clone(decorIndex)
+    },
+    set decorIndex(value) {
+      decorIndex = clone(value)
+    },
+    set decorImageObjects(value) {
+      decorImageObjects = clone(value)
+    },
     set mutationLock(value) {
       lock = clone(value)
     },
@@ -53,6 +70,12 @@ function createRepository() {
     },
     async getDownloadUrl(key) {
       return 'https://cos.example/' + key + '?signed=1'
+    },
+    async getDecorIndex() {
+      return clone(decorIndex)
+    },
+    async getDecorMutationLock() {
+      return clone(decorLock)
     },
     getFormUpload(key, contentType, size, expires, currentTime) {
       this.formUploadCalls.push({ key, contentType, size, expires, currentTime })
@@ -88,11 +111,20 @@ function createRepository() {
     isImageKeyForGift(key, id) {
       return (key.startsWith('gift-folder/images/' + id + '/') || key.startsWith('gift-folder/thumbnails/' + id + '/')) && !key.includes('..')
     },
+    isDecorImageKey(key) {
+      return (key.startsWith('gift-folder/decor/images/') || key.startsWith('gift-folder/decor/thumbnails/')) && !key.includes('..')
+    },
+    isDecorImageKeyForItem(key, id) {
+      return (key.startsWith('gift-folder/decor/images/' + id + '/') || key.startsWith('gift-folder/decor/thumbnails/' + id + '/')) && !key.includes('..')
+    },
     isNotFoundError(error) {
       return Boolean(error && error.statusCode === 404)
     },
     async listImageObjects() {
       return clone(imageObjects)
+    },
+    async listDecorImageObjects() {
+      return clone(decorImageObjects)
     },
     async listLegacyGifts() {
       return Array.from(legacyGifts.values()).map(clone)
@@ -103,6 +135,14 @@ function createRepository() {
       }
       index = clone(value)
     },
+    async putDecorIndex(value) {
+      decorIndex = clone(value)
+    },
+    async releaseDecorMutationLock(owner) {
+      if (!decorLock || decorLock.owner !== owner) return false
+      decorLock = null
+      return true
+    },
     async releaseMutationLock(owner) {
       if (!lock || lock.owner !== owner) return false
       lock = null
@@ -111,6 +151,11 @@ function createRepository() {
     async tryAcquireMutationLock(value) {
       if (lock) return false
       lock = clone(value)
+      return true
+    },
+    async tryAcquireDecorMutationLock(value) {
+      if (decorLock) return false
+      decorLock = clone(value)
       return true
     }
   }
@@ -192,6 +237,15 @@ function seedIndex(repository, gifts, revision = 1) {
     revision,
     updatedAt: 1700000000000,
     gifts
+  }
+}
+
+function seedDecorIndex(repository, items, revision = 1) {
+  repository.decorIndex = {
+    schemaVersion: 2,
+    revision,
+    updatedAt: 1700000000000,
+    items
   }
 }
 
@@ -447,6 +501,51 @@ test('POST Object 策略绑定实际键、类型和精确字节数', async () =>
   assert.equal(signed.formData['x-cos-security-token'], 'session-token')
 })
 
+test('COS 仓储将装修索引、锁和图片限定在 decor 前缀', async () => {
+  const stored = new Map()
+  const listedPrefixes = []
+  const cos = {
+    putObject(params, callback) {
+      stored.set(params.Key, params.Body)
+      callback(null, {})
+    },
+    getObject(params, callback) {
+      if (stored.has(params.Key)) {
+        callback(null, { Body: Buffer.from(stored.get(params.Key), 'utf8') })
+        return
+      }
+      const error = new Error('not found')
+      error.statusCode = 404
+      callback(error)
+    },
+    deleteObject(params, callback) {
+      stored.delete(params.Key)
+      callback(null, {})
+    },
+    getBucket(params, callback) {
+      listedPrefixes.push(params.Prefix)
+      callback(null, { Contents: [], IsTruncated: false })
+    }
+  }
+  const repository = createCosRepository({
+    cos,
+    bucket: 'bucket-1250000000',
+    region: 'ap-guangzhou',
+    prefix: 'gift-folder',
+    downloadUrlTtlSeconds: 60
+  })
+
+  await repository.putDecorIndex({ schemaVersion: 2, revision: 1, items: [] })
+  assert.ok(stored.has('gift-folder/decor/index.json'))
+  assert.equal(await repository.tryAcquireDecorMutationLock({ owner: 'owner' }), true)
+  assert.ok(stored.has('gift-folder/decor/system/index.lock'))
+  await repository.listDecorImageObjects()
+  assert.deepEqual(listedPrefixes.sort(), [
+    'gift-folder/decor/images/',
+    'gift-folder/decor/thumbnails/'
+  ].sort())
+})
+
 test('旧 PUT 上传只在显式兼容截止时间内可用', async () => {
   const disabled = createFixture()
   assert.equal((await disabled.app(request('POST', '/uploads/presign', {
@@ -479,4 +578,197 @@ test('每日 Timer 仅删除超过安全期且未被引用的图片', async () =
   })
   assert.equal(result.deleted, 1)
   assert.deepEqual(fixture.repository.deletedImages, [THUMBNAIL_KEY])
+})
+
+test('装修好物 CRUD 使用独立索引且不改写礼品数据', async () => {
+  const fixture = createFixture()
+  seedIndex(fixture.repository, [gift(GIFT_ID, 1)])
+
+  const created = await fixture.app(request('POST', '/collections/decor/items', {
+    id: DECOR_ID,
+    name: '落地灯',
+    description: '',
+    imageKey: DECOR_IMAGE_KEY,
+    thumbnailKey: DECOR_THUMBNAIL_KEY
+  }, fixture.token))
+  assert.equal(created.statusCode, 201)
+  assert.equal(bodyOf(created).data.total, 1)
+  assert.equal(fixture.repository.index.gifts[0].id, GIFT_ID)
+  assert.equal(fixture.repository.decorIndex.items[0].id, DECOR_ID)
+
+  const listed = await fixture.app(request('GET', '/collections/decor/items', undefined, fixture.token))
+  assert.equal(bodyOf(listed).data.items[0].thumbnailKey, DECOR_THUMBNAIL_KEY)
+  assert.match(bodyOf(listed).data.items[0].thumbnailUrl, /decor\/thumbnails/)
+
+  const image = await fixture.app(request('GET', '/collections/decor/items/' + DECOR_ID + '/image', undefined, fixture.token))
+  assert.match(bodyOf(image).data.imageUrl, /decor\/images/)
+
+  const updated = await fixture.app(request('PUT', '/collections/decor/items/' + DECOR_ID, {
+    name: '',
+    description: '适合客厅',
+    imageKey: '',
+    thumbnailKey: ''
+  }, fixture.token))
+  assert.equal(updated.statusCode, 200)
+  assert.equal(bodyOf(updated).data.description, '适合客厅')
+
+  const deleted = await fixture.app(request('DELETE', '/collections/decor/items/' + DECOR_ID, undefined, fixture.token))
+  assert.equal(bodyOf(deleted).data.total, 0)
+  assert.equal(fixture.repository.index.gifts.length, 1)
+})
+
+test('收藏项跨分类移动保留 ID 和图片，并支持幂等重试', async () => {
+  const fixture = createFixture()
+  seedIndex(fixture.repository, [gift(GIFT_ID, 1, {
+    name: '胡桃木边几',
+    imageKey: IMAGE_KEY,
+    thumbnailKey: THUMBNAIL_KEY
+  })])
+
+  const moved = await fixture.app(request('POST', '/collections/items/' + GIFT_ID + '/move', {
+    targetCollection: 'decor'
+  }, fixture.token))
+  const movedData = bodyOf(moved).data
+  assert.equal(moved.statusCode, 200)
+  assert.equal(movedData.item.id, GIFT_ID)
+  assert.equal(movedData.item.imageKey, IMAGE_KEY)
+  assert.equal(movedData.sourceTotal, 0)
+  assert.equal(movedData.targetTotal, 1)
+  assert.equal(fixture.repository.index.gifts.length, 0)
+  assert.equal(fixture.repository.decorIndex.items[0].id, GIFT_ID)
+
+  const retried = await fixture.app(request('POST', '/collections/items/' + GIFT_ID + '/move', {
+    targetCollection: 'decor'
+  }, fixture.token))
+  assert.equal(bodyOf(retried).data.sourceTotal, 0)
+  assert.equal(fixture.repository.decorIndex.items.length, 1)
+
+  const image = await fixture.app(request(
+    'GET',
+    '/collections/decor/items/' + GIFT_ID + '/image',
+    undefined,
+    fixture.token
+  ))
+  assert.match(bodyOf(image).data.imageUrl, /gift-folder\/images/)
+
+  const movedBack = await fixture.app(request('POST', '/collections/items/' + GIFT_ID + '/move', {
+    targetCollection: 'gift'
+  }, fixture.token))
+  assert.equal(bodyOf(movedBack).data.item.id, GIFT_ID)
+  assert.equal(fixture.repository.index.gifts.length, 1)
+  assert.equal(fixture.repository.decorIndex.items.length, 0)
+})
+
+test('装修好物 ID、上传路径与礼品命名空间严格隔离', async () => {
+  const fixture = createFixture()
+  const invalidId = await fixture.app(request('POST', '/collections/decor/items', {
+    id: GIFT_ID,
+    name: '错误 ID'
+  }, fixture.token))
+  assert.equal(bodyOf(invalidId).error.code, 'INVALID_DECOR_ID')
+
+  const crossImage = await fixture.app(request('POST', '/collections/decor/items', {
+    id: DECOR_ID,
+    name: '',
+    description: '',
+    imageKey: IMAGE_KEY
+  }, fixture.token))
+  assert.equal(bodyOf(crossImage).error.code, 'INVALID_IMAGE_KEY')
+
+  const policy = await fixture.app(request('POST', '/collections/decor/uploads/form-policy', {
+    itemId: DECOR_ID,
+    contentType: 'image/jpeg',
+    size: 1024,
+    asset: 'thumbnail'
+  }, fixture.token))
+  assert.equal(policy.statusCode, 200)
+  assert.match(bodyOf(policy).data.imageKey, /^gift-folder\/decor\/thumbnails\/decor_12345678\//)
+
+  const wrongOrphan = await fixture.app(request('DELETE', '/collections/decor/uploads/orphan', {
+    imageKey: IMAGE_KEY
+  }, fixture.token))
+  assert.equal(bodyOf(wrongOrphan).error.code, 'INVALID_IMAGE_KEY')
+})
+
+test('已存在的异常装修索引不会被空列表覆盖', async () => {
+  const fixture = createFixture()
+  fixture.repository.decorIndex = {
+    schemaVersion: 2,
+    revision: 4,
+    updatedAt: 1700000000000,
+    unexpected: []
+  }
+
+  const result = await fixture.app(
+    request('GET', '/collections/decor/items', undefined, fixture.token)
+  )
+
+  assert.equal(result.statusCode, 503)
+  assert.equal(bodyOf(result).error.code, 'DECOR_INDEX_INVALID')
+  assert.equal(fixture.repository.decorIndex.revision, 4)
+  assert.equal(fixture.repository.decorIndex.items, undefined)
+})
+
+test('装修好物键集分页与礼品分页独立', async () => {
+  const fixture = createFixture()
+  const items = Array.from({ length: 25 }, (_, index) =>
+    gift('decor_page_' + String(index).padStart(8, '0'), 1000 - index)
+  )
+  seedDecorIndex(fixture.repository, items)
+
+  const first = await fixture.app(Object.assign(
+    request('GET', '/collections/decor/items', undefined, fixture.token),
+    { queryStringParameters: { limit: '20' } }
+  ))
+  const firstData = bodyOf(first).data
+  const second = await fixture.app(Object.assign(
+    request('GET', '/collections/decor/items', undefined, fixture.token),
+    { queryStringParameters: { limit: '20', cursor: firstData.nextCursor } }
+  ))
+  const combined = firstData.items.concat(bodyOf(second).data.items).map((item) => item.id)
+  assert.equal(firstData.total, 25)
+  assert.equal(new Set(combined).size, 25)
+})
+
+test('每日 Timer 同时保护礼品和装修好物在用图片', async () => {
+  const fixture = createFixture()
+  seedIndex(fixture.repository, [gift(GIFT_ID, 1, { imageKey: IMAGE_KEY })])
+  seedDecorIndex(fixture.repository, [gift(DECOR_ID, 1, { imageKey: DECOR_IMAGE_KEY })])
+  fixture.repository.imageObjects = [
+    { key: IMAGE_KEY, lastModified: 1, size: 10 },
+    { key: THUMBNAIL_KEY, lastModified: 1, size: 10 }
+  ]
+  fixture.repository.decorImageObjects = [
+    { key: DECOR_IMAGE_KEY, lastModified: 1, size: 10 },
+    { key: DECOR_THUMBNAIL_KEY, lastModified: 1, size: 10 }
+  ]
+
+  const result = await fixture.app({
+    Type: 'Timer',
+    TriggerName: 'GiftImageCleanupDaily'
+  })
+  assert.equal(result.deleted, 2)
+  assert.equal(result.gift.deleted, 1)
+  assert.equal(result.decor.deleted, 1)
+  assert.deepEqual(fixture.repository.deletedImages.sort(), [DECOR_THUMBNAIL_KEY, THUMBNAIL_KEY].sort())
+})
+
+test('移动后清理 Timer 仍保护原命名空间中的图片', async () => {
+  const fixture = createFixture()
+  seedIndex(fixture.repository, [gift(GIFT_ID, 1, {
+    imageKey: IMAGE_KEY,
+    thumbnailKey: THUMBNAIL_KEY
+  })])
+  fixture.repository.imageObjects = [
+    { key: IMAGE_KEY, lastModified: 1, size: 10 },
+    { key: THUMBNAIL_KEY, lastModified: 1, size: 10 }
+  ]
+
+  await fixture.app(request('POST', '/collections/items/' + GIFT_ID + '/move', {
+    targetCollection: 'decor'
+  }, fixture.token))
+  const result = await fixture.app({ Type: 'Timer', TriggerName: 'GiftImageCleanupDaily' })
+
+  assert.equal(result.deleted, 0)
+  assert.deepEqual(fixture.repository.deletedImages, [])
 })

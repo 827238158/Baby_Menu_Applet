@@ -1,6 +1,6 @@
-# 礼品夹 SCF 部署手册
+# 心愿夹 SCF 部署手册
 
-本目录是独立的 Node.js 18 SCF 事件函数。礼品元数据和图片都保存在私有 COS，不使用数据库。`index.json` schema v2 是礼品元数据的唯一真源。
+本目录是独立的 Node.js 18 SCF 事件函数。礼品和装修好物的元数据、图片都保存在同一个私有 COS，不使用数据库；两者复用同一套白名单和会话鉴权，但使用互相隔离的索引、图片前缀和写锁。`gift-folder/index.json` schema v2 仍是礼品元数据的唯一真源，旧版路由和对象 Key 不变。
 
 ## 1. 创建私有 COS 存储桶
 
@@ -18,11 +18,34 @@ gift-folder/images/{giftId}/{timestamp}_{random}.{ext}
 gift-folder/thumbnails/{giftId}/{timestamp}_{random}.{ext}
 gift-folder/index.json
 gift-folder/system/index.lock
+gift-folder/decor/images/{decorId}/{timestamp}_{random}.{ext}
+gift-folder/decor/thumbnails/{decorId}/{timestamp}_{random}.{ext}
+gift-folder/decor/index.json
+gift-folder/decor/system/index.lock
 ```
 
 `gifts/*.json` 是 v1 回滚备份：已有 `index.json` 时以它的礼品集合为准；只有索引不存在时才扫描旧 JSON 重建。升级后日常增删改只写 `index.json`，不再双写礼品 JSON。
 
 首次部署前必须另行备份生产 `gift-folder/index.json` 和 `gift-folder/gifts/` 前缀，不要用本地文件覆盖线上索引。
+
+### 业务路由
+
+原有礼品路由全部保持不变。装修好物新增：
+
+```text
+GET    /collections/decor/items
+POST   /collections/decor/items
+PUT    /collections/decor/items/{id}
+DELETE /collections/decor/items/{id}
+GET    /collections/decor/items/{id}/image
+POST   /collections/decor/uploads/form-policy
+DELETE /collections/decor/uploads/orphan
+POST   /collections/items/{id}/move
+```
+
+新建装修好物的 ID 必须以 `decor_` 开头。移动接口请求体为 `{ "targetCollection": "gift" | "decor" }`，在固定顺序取得两区写锁后先写目标索引、再移除来源；同一请求可安全重试。移动会保留收藏项 ID 和图片 Key，因此移动后的收藏项可以继续引用原命名空间中属于自身 ID 的图片，但仍禁止引用其他收藏项的图片。
+
+上传策略请求使用 `giftId`/`itemId`、`contentType`、`size`、`asset`。新图片仍写入当前分段的图片目录；编辑已经移动过的收藏项时，服务端接受根目录或 `decor/` 目录中归属同一收藏项 ID 的图片。
 
 ## 2. 创建 SCF 运行角色
 
@@ -161,7 +184,7 @@ miniprogram/config/gift-cloud.js
 - CLS 日志只保留排障需要的最短时间，关闭 OpenID 发现模式后避免记录身份信息。
 - 在费用中心设置预算告警，并为 SCF、COS 请求量和外网下行流量设置监控告警。
 - 更新函数代码前先运行 `npm test` 和 `npm run check`。
-- 礼品列表使用 `index.json` v2 键集分页，每页最多 20 件；写操作通过 `system/index.lock` 串行化，锁冲突会返回 503 而不是相互覆盖。
+- 礼品列表使用根目录 `index.json` v2 键集分页，装修好物使用 `decor/index.json` v2 键集分页，每页最多 20 件。普通写入分别使用自己的锁；跨分类移动固定按礼品锁、装修锁顺序同时加锁。
 - 新图片同时保存原图与压缩缩略图：列表只使用缩略图，全屏查看时才签发原图临时 URL。旧图片会回退使用原图，编辑并重新选择图片后会自动升级。
 - 所有 JSON 请求体最多 8KB。`/auth/login` 按 `x-scf-remote-addr` 做每暖实例滑动窗口限流；冷启动或切换实例会重置，不是跨实例全局限流。
 
@@ -173,7 +196,7 @@ miniprogram/config/gift-cloud.js
 - 频率：每天一次，选择业务低峰时段
 - 目标：当前 `index.main_handler`
 
-函数只接受“无 HTTP 方法、`Type === "Timer"`、`TriggerName === "GiftImageCleanupDaily"`”的内部事件。每次在索引锁内扫描原图与缩略图前缀，只删除超过 24 小时且未被 `imageKey` / `thumbnailKey` 引用的对象，单次最多 200 个。删除失败保留到次日重试，日志记录 `scanned` / `candidates` / `deleted` / `failed`。
+函数只接受“无 HTTP 方法、`Type === "Timer"`、`TriggerName === "GiftImageCleanupDaily"`”的内部事件。每次分别扫描两个图片命名空间，但删除前会合并两份索引的引用集合，保护移动后仍留在原命名空间的图片；只删除超过 24 小时且未被任一索引引用的对象，每个命名空间单次最多 200 个。删除失败保留到次日重试，日志同时记录总计和 `gift` / `decor` 分项统计。
 
 创建后先用控制台测试事件执行一次，核对不会删除当前索引在用或不足 24 小时的图片。
 

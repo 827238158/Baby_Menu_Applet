@@ -1,0 +1,46 @@
+{
+  "categories": [
+    {
+      "section": "文档与记忆",
+      "keywords": ["文档", "记忆", "memory", "agents.md", "current.md", "pitfalls", "log", "hook", "codex"],
+      "log_keywords": ["记忆系统", "hook", "agent"],
+      "route_hint": "先核对 MEMORY 的职责与路由，再按 CURRENT 判断当前状态；Hook 只提醒和门禁，不自动写记忆。"
+    },
+    {
+      "section": "编码与环境",
+      "keywords": ["乱码", "编码", "utf-8", "utf8", "中文", "python", "conda", "pip", "openpyxl", "环境"],
+      "log_keywords": ["编码", "python", "conda", "环境"],
+      "route_hint": "优先确认终端编码、文件编码，以及 Python 与 pip 是否来自同一解释器。"
+    },
+    {
+      "section": "菜单数据与图片",
+      "keywords": ["菜单", "菜品", "excel", "workbook", "dish", "category", "imagefile", "商品图片", "生成数据"],
+      "log_keywords": ["菜单", "菜品", "购物车"],
+      "route_hint": "先读 CUSTOMIZATION 和 RUNBOOK，再核对 Excel 真源、生成脚本与图片文件名。"
+    },
+    {
+      "section": "产品与发布边界",
+      "keywords": ["支付", "下单", "订单", "登录", "appid", "真实交易", "云开发", "发布边界"],
+      "log_keywords": ["发布", "appid", "产品边界"],
+      "route_hint": "先确认展示版边界和正式 AppID，未经明确要求不要扩展真实交易能力。"
+    },
+    {
+      "section": "礼品夹云端与权限",
+      "keywords": ["礼品", "gift", "cos", "openid", "白名单", "签名", "上传", "缩略图", "原图", "权限", "版本控制", "写锁"],
+      "log_keywords": ["礼品夹", "cos", "openid", "上传", "缩略图", "写锁"],
+      "route_hint": "先读礼品后端 README，核对 SCF 角色、COS 版本控制、合法域名和索引契约。"
+    },
+    {
+      "section": "SCF 部署与验证",
+      "keywords": ["scf", "部署", "发布", "打包", "gift-api.zip", "404", "timer", "form-policy", "presign", "回滚"],
+      "log_keywords": ["scf", "部署", "发布", "timer", "真机验收", "presign"],
+      "route_hint": "区分本地代码、ZIP 内容、控制台部署和真机验收；按 RUNBOOK 完成完整发布链。"
+    },
+    {
+      "section": "微信小程序 UI",
+      "keywords": ["ui", "布局", "样式", "wxss", "wxml", "按钮", "图标", "动效", "弹层", "真机", "椭圆"],
+      "log_keywords": ["ui", "动效", "真机"],
+      "route_hint": "先读 DESIGN，再搜索对应 WXML、WXSS、JS 和测试；视觉结论需要开发者工具或真机验证。"
+    }
+  ]
+}

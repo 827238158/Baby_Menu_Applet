@@ -1,0 +1,44 @@
+<view class="item-card {{emphasized ? 'item-card-emphasis' : ''}} {{removing ? 'item-card-removing' : ''}}">
+  <view
+    wx:if="{{item.imagePath && item.imageAvailable}}"
+    class="item-image-wrap"
+    bindtap="previewImage"
+  >
+    <image
+      class="item-image"
+      src="{{item.imagePath}}"
+      mode="aspectFill"
+      lazy-load="{{true}}"
+      fade-in="{{false}}"
+      binderror="handleImageError"
+    ></image>
+  </view>
+
+  <view wx:elif="{{collectionType === 'gift'}}" class="item-image-wrap item-placeholder" aria-hidden="true">
+    <view class="placeholder-gift">
+      <view class="placeholder-lid"></view>
+      <view class="placeholder-box"></view>
+      <view class="placeholder-ribbon"></view>
+    </view>
+  </view>
+
+  <view wx:else class="item-image-wrap item-placeholder decor-placeholder" aria-hidden="true">
+    <view class="placeholder-house">
+      <view class="placeholder-house-roof"></view>
+      <view class="placeholder-house-body"></view>
+      <view class="placeholder-house-door"></view>
+    </view>
+  </view>
+
+  <view class="item-info" bindtap="openEditor">
+    <view class="item-title-row">
+      <text class="item-name">{{item.displayName}}</text>
+      <text class="item-date">{{item.dateText}}</text>
+    </view>
+    <text wx:if="{{item.description}}" class="item-description">{{item.description}}</text>
+    <view class="item-edit-hint">
+      <text>查看与编辑</text>
+      <text class="item-edit-arrow">›</text>
+    </view>
+  </view>
+</view>

@@ -11,13 +11,13 @@
       <text class="shop-name">{{shop.name}}</text>
       <text class="shop-subtitle">{{shop.subtitle}}</text>
     </view>
-    <button class="gift-folder-entry" bindtap="openGiftFolder" aria-label="打开礼品夹">
+    <button class="gift-folder-entry" bindtap="openGiftFolder" aria-label="打开心愿夹">
       <view class="gift-entry-icon" aria-hidden="true">
         <view class="gift-entry-lid"></view>
         <view class="gift-entry-box"></view>
         <view class="gift-entry-ribbon"></view>
       </view>
-      <text>礼品夹</text>
+      <text>心愿夹</text>
     </button>
   </view>
 

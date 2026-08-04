@@ -2,9 +2,59 @@ import menuData from '../../data/menu-data.js'
 
 const giftApi = require('../../services/gift-api.js')
 const GIFT_STORAGE_KEY = 'baby_gift_folder_v1'
+const DECOR_STORAGE_KEY = 'baby_decor_folder_v1'
 const SHEET_CLOSE_DURATION = 240
 const CARD_MOTION_DURATION = 240
 const PREVIEW_CLOSE_DURATION = 220
+const COLLECTION_GIFT = 'gift'
+const COLLECTION_DECOR = 'decor'
+const COLLECTION_CONFIG = {
+  gift: {
+    title: '礼品夹',
+    subtitleNoun: '件心仪礼品',
+    createTitle: '收藏新礼品',
+    editTitle: '编辑礼品',
+    nameLabel: '礼品名称',
+    namePlaceholder: '例如：手工陶瓷杯',
+    imageLabel: '为礼品添加一张图片',
+    saveText: '保存到礼品夹',
+    emptyTitle: '还没有收藏礼品',
+    emptyButton: '收藏第一件',
+    addAria: '收藏新礼品',
+    storageKey: GIFT_STORAGE_KEY,
+    idPrefix: 'gift_'
+  },
+  decor: {
+    title: '装修好物',
+    subtitleNoun: '件装修好物',
+    createTitle: '收藏装修好物',
+    editTitle: '编辑装修好物',
+    nameLabel: '好物名称',
+    namePlaceholder: '例如：胡桃木边几',
+    imageLabel: '为好物添加一张图片',
+    saveText: '保存到装修好物',
+    emptyTitle: '还没有收藏装修好物',
+    emptyButton: '收藏第一件',
+    addAria: '收藏装修好物',
+    storageKey: DECOR_STORAGE_KEY,
+    idPrefix: 'decor_'
+  }
+}
+
+function createCollectionState() {
+  return {
+    gifts: [],
+    cachedGifts: [],
+    giftCount: 0,
+    hasMore: true,
+    nextCursor: '',
+    isLoadingMore: false,
+    isInitialLoading: true,
+    loaded: false,
+    loading: false,
+    scrollTop: 0
+  }
+}
 
 function createEmptyForm() {
   return {
@@ -149,6 +199,17 @@ Page({
   data: {
     shop: menuData.shop,
     pageStyle: getPageStyle(menuData.shop),
+    activeCollection: COLLECTION_GIFT,
+    collectionTitle: COLLECTION_CONFIG.gift.title,
+    collectionSubtitleNoun: COLLECTION_CONFIG.gift.subtitleNoun,
+    collectionNameLabel: COLLECTION_CONFIG.gift.nameLabel,
+    collectionNamePlaceholder: COLLECTION_CONFIG.gift.namePlaceholder,
+    collectionImageLabel: COLLECTION_CONFIG.gift.imageLabel,
+    collectionSaveText: COLLECTION_CONFIG.gift.saveText,
+    collectionEmptyTitle: COLLECTION_CONFIG.gift.emptyTitle,
+    collectionEmptyButton: COLLECTION_CONFIG.gift.emptyButton,
+    collectionAddAria: COLLECTION_CONFIG.gift.addAria,
+    listScrollTop: 0,
     gifts: [],
     giftCount: 0,
     accessDenied: false,
@@ -160,6 +221,8 @@ Page({
     saveDisabled: true,
     isSaving: false,
     isDeleting: false,
+    isMoving: false,
+    moveTargetTitle: COLLECTION_CONFIG.decor.title,
     formSheetStyle: '',
     formDragStartY: 0,
     hasMore: true,
@@ -181,6 +244,11 @@ Page({
     this.accessDenied = false
     this.hasLoaded = false
     this.isLoadingGifts = false
+    this.collectionStates = {
+      gift: createCollectionState(),
+      decor: createCollectionState()
+    }
+    this.formCollection = COLLECTION_GIFT
     this.closeTimer = null
     this.cardMotionTimer = null
     this.previewCloseTimer = null
@@ -189,7 +257,7 @@ Page({
 
     if (!giftApi.isConfigured()) {
       wx.showToast({
-        title: '礼品云端尚未配置',
+        title: '心愿夹云端尚未配置',
         icon: 'none'
       })
     }
@@ -199,7 +267,7 @@ Page({
     if (this.hasLoaded || this.isLoadingGifts) {
       return
     }
-    this.loadGifts()
+    this.loadCollection(COLLECTION_GIFT)
   },
 
   onUnload() {
@@ -213,98 +281,189 @@ Page({
     this.cleanupPendingImage()
   },
 
+  getCollectionConfig(collection = this.data.activeCollection) {
+    return COLLECTION_CONFIG[collection] || COLLECTION_CONFIG.gift
+  },
+
+  getCollectionState(collection = this.data.activeCollection) {
+    return this.collectionStates[collection]
+  },
+
+  getCollectionApi(collection) {
+    if (collection === COLLECTION_DECOR) {
+      return {
+        list: giftApi.listDecorItems,
+        create: giftApi.createDecorItem,
+        update: giftApi.updateDecorItem,
+        remove: giftApi.deleteDecorItem,
+        image: giftApi.getDecorImage
+      }
+    }
+
+    return {
+      list: giftApi.listGifts,
+      create: giftApi.createGift,
+      update: giftApi.updateGift,
+      remove: giftApi.deleteGift,
+      image: giftApi.getGiftImage
+    }
+  },
+
+  setActiveCollectionData(collection, extra = {}) {
+    const state = this.getCollectionState(collection)
+    const config = this.getCollectionConfig(collection)
+
+    if (!state || this.data.activeCollection !== collection) return
+
+    this.setData(Object.assign({
+      gifts: state.gifts,
+      giftCount: state.giftCount,
+      hasMore: state.hasMore,
+      nextCursor: state.nextCursor,
+      isLoadingMore: state.isLoadingMore,
+      isInitialLoading: state.isInitialLoading,
+      listScrollTop: state.scrollTop,
+      collectionTitle: config.title,
+      collectionSubtitleNoun: config.subtitleNoun,
+      collectionNameLabel: config.nameLabel,
+      collectionNamePlaceholder: config.namePlaceholder,
+      collectionImageLabel: config.imageLabel,
+      collectionSaveText: config.saveText,
+      collectionEmptyTitle: config.emptyTitle,
+      collectionEmptyButton: config.emptyButton,
+      collectionAddAria: config.addAria
+    }, extra))
+  },
+
+  switchCollection(event) {
+    if (this.data.formVisible || this.data.isPreviewVisible) return
+    const collection = event.currentTarget.dataset.collection
+    if (!COLLECTION_CONFIG[collection] || collection === this.data.activeCollection) return
+
+    // 只切换分段状态，不再主动滚动页面，避免头图和内容产生纵向跳动。
+    this.setData({ activeCollection: collection })
+    this.setActiveCollectionData(collection)
+    const state = this.getCollectionState(collection)
+    if (!state.loaded && !state.loading) {
+      this.loadCollection(collection)
+    }
+  },
+
   loadGifts() {
-    if (this.accessDenied || this.hasLoaded || this.isLoadingGifts) {
+    return this.loadCollection(COLLECTION_GIFT)
+  },
+
+  loadCollection(collection) {
+    const state = this.getCollectionState(collection)
+    if (this.accessDenied || !state || state.loaded || state.loading) {
       return
     }
-    this.isLoadingGifts = true
+    state.loading = true
+    if (collection === COLLECTION_GIFT) this.isLoadingGifts = true
     let gifts = []
+    const config = this.getCollectionConfig(collection)
 
     try {
-      gifts = normalizeGifts(wx.getStorageSync(GIFT_STORAGE_KEY))
+      gifts = normalizeGifts(wx.getStorageSync(config.storageKey))
     } catch (error) {
       wx.showToast({
-        title: '礼品夹读取失败',
+        title: config.title + '读取失败',
         icon: 'none'
       })
     }
 
-    this.cachedGifts = gifts
+    state.cachedGifts = gifts
+    if (collection === COLLECTION_GIFT) this.cachedGifts = gifts
 
     if (giftApi.isConfigured()) {
       // 先完成云端白名单校验，避免未授权账号短暂看到本地缓存内容。
-      this.setData({
-        gifts: [],
-        giftCount: 0,
-        hasMore: true,
-        nextCursor: '',
-        isInitialLoading: true
-      })
-      this.refreshCloudGifts(true)
+      state.gifts = []
+      state.giftCount = 0
+      state.hasMore = true
+      state.nextCursor = ''
+      state.isInitialLoading = true
+      this.setActiveCollectionData(collection)
+      this.refreshCloudCollection(collection, true)
       return
     }
 
-    this.setData({
+    Object.assign(state, {
       gifts,
       giftCount: gifts.length,
       hasMore: false,
       nextCursor: '',
-      isInitialLoading: false
+      isInitialLoading: false,
+      loaded: true,
+      loading: false
     })
-    this.hasLoaded = true
-    this.isLoadingGifts = false
+    this.setActiveCollectionData(collection)
+    if (collection === COLLECTION_GIFT) {
+      this.hasLoaded = true
+      this.isLoadingGifts = false
+    }
   },
 
   async refreshCloudGifts(reset = false) {
-    if (this.data.isLoadingMore) return
-    this.setData({ isLoadingMore: true })
+    return this.refreshCloudCollection(COLLECTION_GIFT, reset)
+  },
+
+  async refreshCloudCollection(collection, reset = false) {
+    const state = this.getCollectionState(collection)
+    if (!state || state.isLoadingMore) return
+    state.isLoadingMore = true
+    this.setActiveCollectionData(collection)
     try {
-      const result = await giftApi.listGifts(reset ? '' : this.data.nextCursor, 20)
+      const api = this.getCollectionApi(collection)
+      const result = await api.list(reset ? '' : state.nextCursor, 20)
       const cloudGifts = Array.isArray(result) ? result : result.items || []
       const normalizedCloudGifts = normalizeGifts(cloudGifts)
       const stableCloudGifts = mergeCloudGiftsWithCache(
         normalizedCloudGifts,
-        this.cachedGifts
+        state.cachedGifts
       )
       const gifts = normalizeGifts(
-        reset ? stableCloudGifts : this.data.gifts.concat(stableCloudGifts)
+        reset ? stableCloudGifts : state.gifts.concat(stableCloudGifts)
       )
 
-      this.persistGifts(gifts)
+      this.persistGifts(gifts, collection)
       const cloudTotal = Number(result && result.total)
-      this.setData({
+      Object.assign(state, {
         gifts,
         giftCount: Number.isInteger(cloudTotal) && cloudTotal >= 0 ? cloudTotal : gifts.length,
         hasMore: Boolean(result && result.hasMore),
         nextCursor: result && result.nextCursor || '',
         isLoadingMore: false,
-        isInitialLoading: false
+        isInitialLoading: false,
+        loaded: reset ? true : state.loaded,
+        loading: false
       })
+      this.setActiveCollectionData(collection)
       if (reset) {
-        this.hasLoaded = true
-        this.isLoadingGifts = false
+        if (collection === COLLECTION_GIFT) {
+          this.hasLoaded = true
+          this.isLoadingGifts = false
+        }
       }
     } catch (error) {
-      this.setData({
-        isLoadingMore: false,
-        isInitialLoading: false
-      })
+      state.isLoadingMore = false
+      state.isInitialLoading = false
+      state.loading = false
       if (reset) {
-        this.isLoadingGifts = false
+        if (collection === COLLECTION_GIFT) this.isLoadingGifts = false
       }
       if (error && error.code === 'FORBIDDEN') {
+        this.setActiveCollectionData(collection)
         this.handleCloudError(error, '云端同步失败，已显示缓存')
         return
       }
-      if (!this.accessDenied && reset && this.cachedGifts) {
-        this.setData({
-          gifts: this.cachedGifts,
-          giftCount: this.cachedGifts.length,
-          hasMore: false,
-          nextCursor: '',
-          isInitialLoading: false
-        })
+      if (!this.accessDenied && reset && state.cachedGifts) {
+        state.gifts = state.cachedGifts
+        state.giftCount = state.cachedGifts.length
+        state.hasMore = false
+        state.nextCursor = ''
+        state.loaded = true
       }
+      this.setActiveCollectionData(collection)
       this.handleCloudError(error, '云端同步失败，已显示缓存')
     }
   },
@@ -316,6 +475,18 @@ Page({
       }
 
       this.accessDenied = true
+      Object.values(this.collectionStates).forEach((state) => {
+        Object.assign(state, {
+          gifts: [],
+          giftCount: 0,
+          hasMore: false,
+          nextCursor: '',
+          isLoadingMore: false,
+          isInitialLoading: false,
+          loaded: false,
+          loading: false
+        })
+      })
       this.setData({
         accessDenied: true,
         gifts: [],
@@ -339,19 +510,26 @@ Page({
   openCreateForm() {
     if (this.accessDenied) return
     const form = createEmptyForm()
+    const collection = this.data.activeCollection
+    const config = this.getCollectionConfig(collection)
 
     this.invalidateImageSelection()
     this.pendingImagePath = ''
     this.pendingThumbnailPath = ''
+    this.formCollection = collection
     this.setData({
       formVisible: true,
       formClosing: false,
       isEditing: false,
-      formTitle: '收藏新礼品',
+      formTitle: config.createTitle,
       form,
       saveDisabled: true,
       isSaving: false,
       isDeleting: false,
+      isMoving: false,
+      moveTargetTitle: this.getCollectionConfig(
+        collection === COLLECTION_GIFT ? COLLECTION_DECOR : COLLECTION_GIFT
+      ).title,
       formSheetStyle: '',
       formDragStartY: 0
     })
@@ -359,7 +537,7 @@ Page({
 
   openEditForm(event) {
     if (this.accessDenied) return
-    const id = event.currentTarget.dataset.id
+    const id = event.detail && event.detail.id || event.currentTarget.dataset.id
     const gift = this.data.gifts.find((item) => item.id === id)
 
     if (!gift) {
@@ -378,22 +556,27 @@ Page({
     this.invalidateImageSelection()
     this.pendingImagePath = ''
     this.pendingThumbnailPath = ''
+    this.formCollection = this.data.activeCollection
     this.setData({
       formVisible: true,
       formClosing: false,
       isEditing: true,
-      formTitle: '编辑礼品',
+      formTitle: this.getCollectionConfig(this.formCollection).editTitle,
       form,
       saveDisabled: false,
       isSaving: false,
       isDeleting: false,
+      isMoving: false,
+      moveTargetTitle: this.getCollectionConfig(
+        this.formCollection === COLLECTION_GIFT ? COLLECTION_DECOR : COLLECTION_GIFT
+      ).title,
       formSheetStyle: '',
       formDragStartY: 0
     })
   },
 
   requestCloseForm() {
-    if (this.data.isSaving || this.data.isDeleting || this.data.formClosing) {
+    if (this.data.isSaving || this.data.isDeleting || this.data.isMoving || this.data.formClosing) {
       return
     }
 
@@ -417,6 +600,7 @@ Page({
 
   hideForm() {
     const form = createEmptyForm()
+    const config = this.getCollectionConfig(this.data.activeCollection)
 
     if (this.closeTimer) {
       clearTimeout(this.closeTimer)
@@ -428,11 +612,12 @@ Page({
       formVisible: false,
       formClosing: false,
       isEditing: false,
-      formTitle: '收藏新礼品',
+      formTitle: config.createTitle,
       form,
       saveDisabled: true,
       isSaving: false,
       isDeleting: false,
+      isMoving: false,
       formSheetStyle: '',
       formDragStartY: 0
     })
@@ -503,7 +688,7 @@ Page({
   },
 
   showImageSourceActions() {
-    if (!this.data.formVisible || this.data.isSaving || this.data.isDeleting || this.data.formClosing) {
+    if (!this.data.formVisible || this.data.isSaving || this.data.isDeleting || this.data.isMoving || this.data.formClosing) {
       return
     }
 
@@ -521,7 +706,7 @@ Page({
   },
 
   chooseImage(sourceType = 'album') {
-    if (!this.data.formVisible || this.data.isSaving || this.data.isDeleting || this.data.formClosing) {
+    if (!this.data.formVisible || this.data.isSaving || this.data.isDeleting || this.data.isMoving || this.data.formClosing) {
       return
     }
 
@@ -636,7 +821,7 @@ Page({
   },
 
   confirmRemoveFormImage() {
-    if (this.data.isSaving || this.data.isDeleting || this.data.formClosing) {
+    if (this.data.isSaving || this.data.isDeleting || this.data.isMoving || this.data.formClosing) {
       return
     }
 
@@ -654,7 +839,7 @@ Page({
   },
 
   removeFormImage() {
-    if (this.data.isSaving || this.data.isDeleting || this.data.formClosing) {
+    if (this.data.isSaving || this.data.isDeleting || this.data.isMoving || this.data.formClosing) {
       return
     }
 
@@ -672,7 +857,7 @@ Page({
   },
 
   handleNameInput(event) {
-    if (this.data.isSaving || this.data.isDeleting || this.data.formClosing) {
+    if (this.data.isSaving || this.data.isDeleting || this.data.isMoving || this.data.formClosing) {
       return
     }
 
@@ -683,7 +868,7 @@ Page({
   },
 
   handleDescriptionInput(event) {
-    if (this.data.isSaving || this.data.isDeleting || this.data.formClosing) {
+    if (this.data.isSaving || this.data.isDeleting || this.data.isMoving || this.data.formClosing) {
       return
     }
 
@@ -694,10 +879,14 @@ Page({
   },
 
   async saveGift() {
-    if (this.data.isSaving || this.data.isDeleting || this.accessDenied) {
+    if (this.data.isSaving || this.data.isDeleting || this.data.isMoving || this.accessDenied) {
       return
     }
     const form = Object.assign({}, this.data.form)
+    const collection = this.formCollection || this.data.activeCollection
+    const config = this.getCollectionConfig(collection)
+    const state = this.getCollectionState(collection)
+    const api = this.getCollectionApi(collection)
 
     if (!this.hasFormContent(form)) {
       wx.showToast({
@@ -707,9 +896,9 @@ Page({
       return
     }
 
-    const sourceGift = this.data.gifts.find((gift) => gift.id === form.id)
+    const sourceGift = state.gifts.find((gift) => gift.id === form.id)
     const id = form.id ||
-      'gift_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10)
+      config.idPrefix + Date.now() + '_' + Math.random().toString(36).slice(2, 10)
     if (!form.id) {
       form.id = id
       // 创建失败后保留同一 ID，重试时由后端幂等处理，避免误删已生效图片。
@@ -734,7 +923,8 @@ Page({
         const uploaded = await giftApi.uploadImages(
           this.pendingImagePath,
           this.pendingThumbnailPath || this.pendingImagePath,
-          id
+          id,
+          collection
         )
         imageKey = uploaded.imageKey
         thumbnailKey = uploaded.thumbnailKey
@@ -749,23 +939,24 @@ Page({
         description: (form.description || '').trim()
       }
       const savedGift = sourceGift
-        ? await giftApi.updateGift(payload)
-        : await giftApi.createGift(payload)
+        ? await api.update(payload)
+        : await api.create(payload)
       const total = Number.isInteger(savedGift && savedGift.total)
         ? savedGift.total
-        : this.data.giftCount + (sourceGift ? 0 : 1)
+        : state.giftCount + (sourceGift ? 0 : 1)
       const nextGifts = sourceGift
-        ? this.data.gifts.map((item) => item.id === sourceGift.id ? savedGift : item)
-        : [savedGift].concat(this.data.gifts)
+        ? state.gifts.map((item) => item.id === sourceGift.id ? savedGift : item)
+        : [savedGift].concat(state.gifts)
       const gifts = normalizeGifts(nextGifts)
       // 云端保存成功后再刷新缓存和页面，避免显示尚未落盘的数据。
-      this.persistGifts(gifts)
+      this.persistGifts(gifts, collection)
       this.cleanupPendingImage()
-      this.setData({
+      Object.assign(state, {
         gifts,
         giftCount: total,
         hasMore: total > gifts.length
       })
+      this.setActiveCollectionData(collection)
       await this.startCloseAnimation()
 
       if (!this.pageDestroyed) {
@@ -783,7 +974,12 @@ Page({
         icon: 'success'
       })
     } catch (error) {
-      uploadedImageKeys.forEach((imageKey) => giftApi.deleteOrphan(imageKey).catch(() => {}))
+      uploadedImageKeys.forEach((imageKey) => {
+        const cleanup = collection === COLLECTION_DECOR
+          ? giftApi.deleteCollectionOrphan(imageKey, collection)
+          : giftApi.deleteOrphan(imageKey)
+        cleanup.catch(() => {})
+      })
 
       this.setData({
         isSaving: false,
@@ -794,19 +990,22 @@ Page({
   },
 
   confirmDelete() {
-    if (this.data.isSaving || this.data.isDeleting) {
+    if (this.data.isSaving || this.data.isDeleting || this.data.isMoving) {
       return
     }
 
-    const gift = this.data.gifts.find((item) => item.id === this.data.form.id)
+    const collection = this.formCollection || this.data.activeCollection
+    const config = this.getCollectionConfig(collection)
+    const gift = this.getCollectionState(collection).gifts
+      .find((item) => item.id === this.data.form.id)
 
     if (!gift) {
       return
     }
 
     wx.showModal({
-      title: '删除礼品',
-      content: '确定从礼品夹中删除“' + gift.displayName + '”吗？',
+      title: '删除' + (collection === COLLECTION_DECOR ? '好物' : '礼品'),
+      content: '确定从' + config.title + '中删除“' + gift.displayName + '”吗？',
       confirmText: '删除',
       confirmColor: '#c45f72',
       success: (result) => {
@@ -818,7 +1017,7 @@ Page({
   },
 
   async deleteGift(gift) {
-    if (this.data.isDeleting || this.data.isSaving) {
+    if (this.data.isDeleting || this.data.isSaving || this.data.isMoving) {
       return
     }
 
@@ -827,21 +1026,24 @@ Page({
     })
 
     try {
-      const result = await giftApi.deleteGift(gift.id)
+      const collection = this.formCollection || this.data.activeCollection
+      const state = this.getCollectionState(collection)
+      const result = await this.getCollectionApi(collection).remove(gift.id)
       const gifts = normalizeGifts(
-        this.data.gifts.filter((item) => item.id !== gift.id)
+        state.gifts.filter((item) => item.id !== gift.id)
       )
 
-      this.persistGifts(gifts)
+      this.persistGifts(gifts, collection)
       this.cleanupPendingImage()
-      this.setData({
+      Object.assign(state, {
         giftCount: Number.isInteger(result && result.total)
           ? result.total
-          : Math.max(0, this.data.giftCount - 1),
+          : Math.max(0, state.giftCount - 1),
         hasMore: Number.isInteger(result && result.total)
           ? result.total > gifts.length
-          : this.data.hasMore
+          : state.hasMore
       })
+      this.setActiveCollectionData(collection)
       await this.startCloseAnimation()
 
       if (!this.pageDestroyed) {
@@ -856,7 +1058,8 @@ Page({
       }
 
       if (!this.pageDestroyed) {
-        this.setData({ gifts, removingGiftId: '' })
+        state.gifts = gifts
+        this.setActiveCollectionData(collection, { removingGiftId: '' })
       }
 
       wx.showToast({
@@ -871,9 +1074,9 @@ Page({
     }
   },
 
-  persistGifts(gifts) {
+  persistGifts(gifts, collection = this.data.activeCollection) {
     try {
-      wx.setStorageSync(GIFT_STORAGE_KEY, serializeGifts(gifts))
+      wx.setStorageSync(this.getCollectionConfig(collection).storageKey, serializeGifts(gifts))
       return true
     } catch (error) {
       wx.showToast({
@@ -885,12 +1088,12 @@ Page({
   },
 
   async previewImage(event) {
-    const id = event.currentTarget.dataset.id
+    const id = event.detail && event.detail.id || event.currentTarget.dataset.id
     if (!id || this.data.isPreviewLoading) return
 
     this.setData({ isPreviewLoading: true })
     try {
-      const result = await giftApi.getGiftImage(id)
+      const result = await this.getCollectionApi(this.data.activeCollection).image(id)
       if (!result || !result.imageUrl) throw new Error('图片加载失败')
       this.setData({
         isPreviewVisible: true,
@@ -924,59 +1127,144 @@ Page({
   },
 
   loadMoreGifts() {
-    if (!this.data.hasMore || this.data.isLoadingMore || !giftApi.isConfigured()) return
-    this.refreshCloudGifts(false)
+    const collection = this.data.activeCollection
+    const state = this.getCollectionState(collection)
+    if (!state.hasMore || state.isLoadingMore || !giftApi.isConfigured()) return
+    this.refreshCloudCollection(collection, false)
   },
 
-  onReachBottom() {
-    this.loadMoreGifts()
+  handleListScroll(event) {
+    const state = this.getCollectionState(this.data.activeCollection)
+    if (!state) return
+
+    // 滚动过程中只记录实例状态，避免高频 setData；切回分段时再恢复位置。
+    state.scrollTop = Math.max(0, Number(event.detail && event.detail.scrollTop) || 0)
   },
 
   handleImageError(event) {
-    const id = event.currentTarget.dataset.id
-    const gift = this.data.gifts.find((item) => item.id === id)
+    const id = event.detail && event.detail.id || event.currentTarget.dataset.id
+    const collection = this.data.activeCollection
+    const state = this.getCollectionState(collection)
+    const gift = state.gifts.find((item) => item.id === id)
 
     if (!gift) {
       return
     }
 
     if (gift.imageUrl && !gift.imageFallbackTried) {
-      const pendingGifts = this.data.gifts.map((item) => item.id === id
+      const pendingGifts = state.gifts.map((item) => item.id === id
         ? Object.assign({}, item, { imageFallbackTried: true })
         : item)
 
-      this.setData({ gifts: pendingGifts })
+      state.gifts = pendingGifts
+      this.setActiveCollectionData(collection)
       wx.downloadFile({
         url: gift.imageUrl,
         success: (result) => {
           if (result.statusCode === 200 && result.tempFilePath) {
-            const gifts = this.data.gifts.map((item) => item.id === id
+            const gifts = state.gifts.map((item) => item.id === id
               ? Object.assign({}, item, {
                 imagePath: result.tempFilePath,
                 imageAvailable: true
               })
               : item)
-            this.setData({ gifts })
+            state.gifts = gifts
+            this.setActiveCollectionData(collection)
             return
           }
-          this.markImageUnavailable(id)
+          this.markImageUnavailable(id, collection)
         },
         fail: () => {
-          this.markImageUnavailable(id)
+          this.markImageUnavailable(id, collection)
         }
       })
       return
     }
 
-    this.markImageUnavailable(id)
+    this.markImageUnavailable(id, collection)
   },
 
-  markImageUnavailable(id) {
-    const gifts = this.data.gifts.map((gift) => gift.id === id
+  confirmMove() {
+    if (!this.data.isEditing || this.data.isSaving || this.data.isDeleting || this.data.isMoving) return
+
+    const sourceCollection = this.formCollection || this.data.activeCollection
+    const targetCollection = sourceCollection === COLLECTION_GIFT ? COLLECTION_DECOR : COLLECTION_GIFT
+    const item = this.getCollectionState(sourceCollection).gifts
+      .find((entry) => entry.id === this.data.form.id)
+    if (!item) return
+
+    wx.showModal({
+      title: '移动收藏',
+      content: '将“' + item.displayName + '”移到' + this.getCollectionConfig(targetCollection).title + '？',
+      confirmText: '移动',
+      confirmColor: '#c45f72',
+      success: (result) => {
+        if (result.confirm) this.moveCollectionItem(item, sourceCollection, targetCollection)
+      }
+    })
+  },
+
+  async moveCollectionItem(item, sourceCollection, targetCollection) {
+    if (this.data.isSaving || this.data.isDeleting || this.data.isMoving) return
+
+    this.setData({ isMoving: true, saveDisabled: true })
+    try {
+      const result = await giftApi.moveCollectionItem(item.id, targetCollection)
+      const movedItem = normalizeGift(result && result.item)
+      if (!movedItem) throw new Error('移动后的收藏数据无效')
+
+      const sourceState = this.getCollectionState(sourceCollection)
+      const targetState = this.getCollectionState(targetCollection)
+      sourceState.gifts = normalizeGifts(sourceState.gifts.filter((entry) => entry.id !== item.id))
+      targetState.gifts = normalizeGifts([movedItem].concat(targetState.gifts))
+      sourceState.cachedGifts = sourceState.gifts
+      targetState.cachedGifts = targetState.gifts
+      sourceState.giftCount = Number.isInteger(result.sourceTotal)
+        ? result.sourceTotal
+        : Math.max(0, sourceState.giftCount - 1)
+      targetState.giftCount = Number.isInteger(result.targetTotal)
+        ? result.targetTotal
+        : targetState.giftCount + 1
+      sourceState.hasMore = sourceState.giftCount > sourceState.gifts.length
+      targetState.hasMore = targetState.giftCount > targetState.gifts.length
+      Object.assign(targetState, {
+        loaded: true,
+        loading: false,
+        isInitialLoading: false,
+        isLoadingMore: false
+      })
+      this.persistGifts(sourceState.gifts, sourceCollection)
+      this.persistGifts(targetState.gifts, targetCollection)
+
+      await this.startCloseAnimation()
+      if (this.pageDestroyed) return
+
+      // 移动完成后切到目标分段，头图和列表容器保持原位。
+      this.setData({ activeCollection: targetCollection, recentGiftId: movedItem.id })
+      this.setActiveCollectionData(targetCollection)
+      if (this.cardMotionTimer) clearTimeout(this.cardMotionTimer)
+      this.cardMotionTimer = setTimeout(() => {
+        this.cardMotionTimer = null
+        if (!this.pageDestroyed) this.setData({ recentGiftId: '' })
+      }, CARD_MOTION_DURATION + 80)
+      wx.showToast({ title: '已移到' + this.getCollectionConfig(targetCollection).title, icon: 'success' })
+    } catch (error) {
+      this.setData({
+        isMoving: false,
+        saveDisabled: !this.hasFormContent(this.data.form)
+      })
+      this.handleCloudError(error, '移动失败，请稍后重试')
+    }
+  },
+
+  markImageUnavailable(id, collection = this.data.activeCollection) {
+    const state = this.getCollectionState(collection)
+    const gifts = state.gifts.map((gift) => gift.id === id
       ? Object.assign({}, gift, { imageAvailable: false })
       : gift)
 
-    this.setData({ gifts })
+    state.gifts = gifts
+    this.setActiveCollectionData(collection)
   },
 
   cleanupPendingImage() {
