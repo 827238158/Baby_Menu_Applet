@@ -30,10 +30,9 @@
 - 用户截图显示微信开发者工具实际错误为 `Component is not found in path`，此前只定位滚动高度并不完整；原礼品数量正确，数据仍未丢失。
 - 已将卡片组件注册改为页面相对路径 `../../components/collection-item-card/collection-item-card`，并保留列表明确高度修复；新增测试校验组件引用及四个组件文件。
 - 修正后小程序侧 44 项测试、组件 JSON/JS 检查和 `git diff --check` 通过；需要在开发者工具清缓存并重新编译验证。
-- 当前改动已在分支 `codex/gift-decor-segments` 创建本地提交；该分支尚未设置远端上游。
+- 当前改动已提交并推送到 `origin/codex/gift-decor-segments`，本地分支已设置同名远端上游。
 
 ## 阻塞与下一步
 
 - 需重新编译小程序，在微信开发者工具和真机确认原礼品卡片恢复、固定头图占高、长列表滚动、分段位置恢复、移动后的图片预览和窄屏布局。
 - 发布仍需先部署新版 SCF，再发布小程序；否则装修和移动新路由会返回 404。
-- 推送目标为 `origin/codex/gift-decor-segments`；因外传安全审批被拦截，需用户明确授权将本次源码、配置和文档提交推送到 `git@github.com:827238158/Baby_Menu_Applet.git` 后再执行。
