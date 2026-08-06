@@ -255,6 +255,73 @@ test('图片上传失败时返回明确错误，不会继续保存礼品', async
   )
 })
 
+test('缩略图上传失败时等待孤儿原图清理完成再返回错误', async () => {
+  const imageKey = 'gift-folder/images/gift_12345678/original.jpg'
+  let cleanupRequest
+  const wxMock = createWxMock((options) => {
+    if (options.url.endsWith('/uploads/form-policy')) {
+      if (options.data.asset === 'image') {
+        options.success({
+          statusCode: 200,
+          data: {
+            data: {
+              imageKey,
+              uploadUrl: 'https://bucket.cos.example/',
+              contentType: 'image/jpeg',
+              formData: { key: imageKey }
+            }
+          }
+        })
+        return
+      }
+
+      options.success({
+        statusCode: 503,
+        data: {
+          error: {
+            code: 'THUMBNAIL_UPLOAD_FAILED',
+            message: '缩略图上传失败'
+          }
+        }
+      })
+      return
+    }
+
+    if (options.url.endsWith('/uploads/orphan')) {
+      cleanupRequest = options
+    }
+  }, { session: validSession() })
+  const api = giftApiModule.createGiftApi(wxMock, {
+    apiBaseUrl: 'https://gift.example'
+  })
+
+  let settled = false
+  const uploadPromise = api.uploadImages(
+    'wxfile://original.jpg',
+    'wxfile://thumbnail.jpg',
+    'gift_12345678'
+  )
+  uploadPromise.then(
+    () => { settled = true },
+    () => { settled = true }
+  )
+
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.ok(cleanupRequest)
+  assert.equal(cleanupRequest.method, 'DELETE')
+  assert.equal(cleanupRequest.data.imageKey, imageKey)
+  assert.equal(settled, false)
+
+  cleanupRequest.success({
+    statusCode: 200,
+    data: { data: { imageKey } }
+  })
+  await assert.rejects(
+    uploadPromise,
+    (error) => error.code === 'THUMBNAIL_UPLOAD_FAILED'
+  )
+})
+
 test('未配置函数 URL 时不会发起网络请求', async () => {
   const wxMock = createWxMock(() => {
     throw new Error('不应发起请求')

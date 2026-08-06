@@ -1058,7 +1058,12 @@ Page({
       }
 
       if (!this.pageDestroyed) {
-        state.gifts = gifts
+        // 动画等待期间分页或图片回调仍可能更新列表，必须基于最新状态删除目标项。
+        const latestGifts = normalizeGifts(
+          state.gifts.filter((item) => item.id !== gift.id)
+        )
+        state.gifts = latestGifts
+        this.persistGifts(latestGifts, collection)
         this.setActiveCollectionData(collection, { removingGiftId: '' })
       }
 

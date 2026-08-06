@@ -936,21 +936,49 @@ test('云端删除成功后等待卡片退场再移除列表数据', async () =>
     updatedAt: 1,
     displayName: '待删除礼品'
   }
+  const paginatedGift = {
+    id: 'gift_paginated123',
+    name: '动画期间加载的礼品',
+    description: '',
+    imagePath: '',
+    imageKey: '',
+    createdAt: 2,
+    updatedAt: 2,
+    displayName: '动画期间加载的礼品'
+  }
   const wxMock = createWxMock([gift])
   const page = loadPage({
     isConfigured: () => true,
-    deleteGift: async () => ({ total: 0 })
+    deleteGift: async () => ({ total: 1 })
   }, wxMock)
+  const state = page.getCollectionState('gift')
+  state.gifts = [gift]
+  state.giftCount = 1
   page.data.gifts = [gift]
   page.data.giftCount = 1
   page.data.formVisible = true
   page.data.isEditing = true
   page.data.form = Object.assign({}, gift)
 
+  setTimeout(() => {
+    // 模拟删除动画期间完成的分页请求，列表与游标均已推进。
+    state.gifts = [gift, paginatedGift]
+    state.giftCount = 1
+    state.hasMore = false
+    state.nextCursor = 'cursor-after-paginated'
+    page.persistGifts(state.gifts, 'gift')
+    page.setActiveCollectionData('gift')
+  }, 300)
+
   await page.deleteGift(gift)
 
   assert.equal(page.data.formVisible, false)
   assert.equal(page.data.removingGiftId, '')
-  assert.equal(page.data.gifts.length, 0)
-  assert.equal(wxMock.storage.get(STORAGE_KEY).length, 0)
+  assert.equal(page.data.gifts.map((item) => item.id).join(','), paginatedGift.id)
+  assert.equal(
+    wxMock.storage.get(STORAGE_KEY).map((item) => item.id).join(','),
+    paginatedGift.id
+  )
+  assert.equal(state.nextCursor, 'cursor-after-paginated')
+  assert.equal(state.hasMore, false)
 })

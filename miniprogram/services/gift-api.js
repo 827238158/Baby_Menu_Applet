@@ -332,7 +332,8 @@ function createGiftApi(wxApi, config = giftCloudConfig) {
         const thumbnailKey = await uploadImage(thumbnailPath, itemId, 'thumbnail', collection)
         return { imageKey, thumbnailKey }
       } catch (error) {
-        authorizedRequest({
+        // 等待孤儿原图清理结束，避免页面退出时后台请求被直接中断。
+        await authorizedRequest({
           path: collection === 'decor'
             ? '/collections/decor/uploads/orphan'
             : '/uploads/orphan',
