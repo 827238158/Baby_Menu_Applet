@@ -151,6 +151,71 @@ test('图片通过受约束的 POST Object 表单流式上传 COS', async () => 
   assert.equal(wxMock.requests.some((item) => item.method === 'PUT'), false)
 })
 
+test('装修好物使用独立路由和 decor 图片命名空间', async () => {
+  const decorImageKey = 'gift-folder/decor/images/decor_12345678/test.jpg'
+  const wxMock = createWxMock((options) => {
+    if (options.url.includes('/collections/decor/items?')) {
+      options.success({
+        statusCode: 200,
+        data: { data: { items: [], total: 0, hasMore: false, nextCursor: '' } }
+      })
+      return
+    }
+    if (options.url.endsWith('/collections/decor/uploads/form-policy')) {
+      assert.equal(options.data.itemId, 'decor_12345678')
+      options.success({
+        statusCode: 200,
+        data: {
+          data: {
+            imageKey: decorImageKey,
+            uploadUrl: 'https://bucket.cos.example/',
+            contentType: 'image/jpeg',
+            formData: { key: decorImageKey }
+          }
+        }
+      })
+    }
+  }, { session: validSession() })
+  const api = giftApiModule.createGiftApi(wxMock, {
+    apiBaseUrl: 'https://gift.example'
+  })
+
+  const listed = await api.listDecorItems('', 20)
+  const uploaded = await api.uploadImage(
+    'wxfile://decor.jpg',
+    'decor_12345678',
+    'image',
+    'decor'
+  )
+
+  assert.equal(listed.total, 0)
+  assert.equal(uploaded, decorImageKey)
+  assert.equal(wxMock.uploads[0].formData.key, decorImageKey)
+})
+
+test('收藏项通过统一移动接口切换分类', async () => {
+  const wxMock = createWxMock((options) => {
+    assert.match(options.url, /\/collections\/items\/gift_12345678\/move$/)
+    assert.equal(options.method, 'POST')
+    assert.equal(options.data.targetCollection, 'decor')
+    options.success({
+      statusCode: 200,
+      data: {
+        data: {
+          item: { id: 'gift_12345678', name: '边几' },
+          sourceTotal: 0,
+          targetTotal: 1
+        }
+      }
+    })
+  }, { session: validSession() })
+  const api = giftApiModule.createGiftApi(wxMock, { apiBaseUrl: 'https://gift.example' })
+
+  const result = await api.moveCollectionItem('gift_12345678', 'decor')
+  assert.equal(result.item.id, 'gift_12345678')
+  assert.equal(result.targetTotal, 1)
+})
+
 test('图片上传失败时返回明确错误，不会继续保存礼品', async () => {
   const wxMock = createWxMock((options) => {
     if (options.url.endsWith('/uploads/form-policy')) {

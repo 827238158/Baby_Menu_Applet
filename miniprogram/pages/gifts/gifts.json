@@ -1,5 +1,9 @@
 {
-  "navigationBarTitleText": "我的礼品夹",
+  "navigationBarTitleText": "我的心愿夹",
   "navigationBarBackgroundColor": "#ffffff",
-  "navigationBarTextStyle": "black"
+  "navigationBarTextStyle": "black",
+  "disableScroll": true,
+  "usingComponents": {
+    "collection-item-card": "../../components/collection-item-card/collection-item-card"
+  }
 }

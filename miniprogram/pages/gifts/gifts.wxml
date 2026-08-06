@@ -1,109 +1,119 @@
 <view class="page" style="{{pageStyle}}">
-  <view class="gift-header">
-    <image
-      wx:if="{{shop.headerBackgroundImage}}"
-      class="gift-header-bg"
-      src="{{shop.headerBackgroundImage}}"
-      mode="aspectFill"
-    ></image>
-    <view class="gift-header-overlay"></view>
-    <view class="gift-header-copy">
-      <text class="gift-header-title">我的礼品夹</text>
-      <text wx:if="{{isInitialLoading}}" class="gift-header-subtitle">正在同步礼品夹…</text>
-      <text wx:else class="gift-header-subtitle">已收藏 {{giftCount}} 件心仪礼品</text>
+  <view class="collection-shell-header">
+    <view class="gift-header">
+      <image
+        wx:if="{{shop.headerBackgroundImage}}"
+        class="gift-header-bg"
+        src="{{shop.headerBackgroundImage}}"
+        mode="aspectFill"
+      ></image>
+      <view class="gift-header-overlay"></view>
+      <view class="gift-header-copy">
+        <text class="gift-header-title">我的心愿夹</text>
+        <text wx:if="{{isInitialLoading}}" class="gift-header-subtitle">正在同步{{collectionTitle}}…</text>
+        <text wx:else class="gift-header-subtitle">已收藏 {{giftCount}} {{collectionSubtitleNoun}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{!accessDenied}}" class="collection-segment-wrap">
+      <view class="collection-segment" aria-role="tablist" aria-label="心愿夹分类">
+        <view class="collection-segment-indicator {{activeCollection === 'decor' ? 'collection-segment-indicator-right' : ''}}"></view>
+        <view
+          class="collection-segment-item {{activeCollection === 'gift' ? 'collection-segment-item-active' : ''}}"
+          data-collection="gift"
+          bindtap="switchCollection"
+          aria-role="tab"
+          aria-selected="{{activeCollection === 'gift'}}"
+        >礼品夹</view>
+        <view
+          class="collection-segment-item {{activeCollection === 'decor' ? 'collection-segment-item-active' : ''}}"
+          data-collection="decor"
+          bindtap="switchCollection"
+          aria-role="tab"
+          aria-selected="{{activeCollection === 'decor'}}"
+        >装修好物</view>
+      </view>
     </view>
   </view>
 
-  <view wx:if="{{accessDenied}}" class="access-denied-state">
+  <view wx:if="{{accessDenied}}" class="access-denied-state collection-body">
     <view class="access-denied-icon">!</view>
-    <text class="access-denied-title">仅限受邀用户使用礼品夹</text>
-    <text class="access-denied-description">当前微信账号不在授权名单中，无法查看或编辑礼品内容。</text>
+    <text class="access-denied-title">仅限受邀用户使用心愿夹</text>
+    <text class="access-denied-description">当前微信账号不在授权名单中，无法查看或编辑收藏内容。</text>
     <button class="access-denied-button" bindtap="backToMenu">返回菜单</button>
   </view>
 
-  <view
-    wx:if="{{!accessDenied && isInitialLoading}}"
-    class="gift-skeleton-list"
-    aria-label="正在加载礼品"
-    aria-busy="true"
+  <scroll-view
+    wx:if="{{!accessDenied}}"
+    class="collection-list-scroll"
+    scroll-y="{{true}}"
+    scroll-top="{{listScrollTop}}"
+    enable-back-to-top="{{true}}"
+    lower-threshold="120"
+    bindscroll="handleListScroll"
+    bindscrolltolower="loadMoreGifts"
   >
-    <view
-      class="gift-card gift-skeleton-card"
-      wx:for="{{loadingSkeletons}}"
-      wx:key="*this"
-    >
-      <view class="gift-skeleton-image gift-skeleton-block"></view>
-      <view class="gift-skeleton-info">
-        <view class="gift-skeleton-title gift-skeleton-block"></view>
-        <view class="gift-skeleton-line gift-skeleton-line-long gift-skeleton-block"></view>
-        <view class="gift-skeleton-line gift-skeleton-line-short gift-skeleton-block"></view>
-      </view>
-    </view>
-  </view>
-
-  <view wx:if="{{!accessDenied && !isInitialLoading && gifts.length}}" class="gift-list">
-    <view
-      class="gift-card {{recentGiftId === item.id ? 'gift-card-emphasis' : ''}} {{removingGiftId === item.id ? 'gift-card-removing' : ''}}"
-      wx:for="{{gifts}}"
-      wx:key="id"
-    >
+    <view class="collection-content">
       <view
-        wx:if="{{item.imagePath && item.imageAvailable}}"
-        class="gift-image-wrap"
-        data-id="{{item.id}}"
-        bindtap="previewImage"
+        wx:if="{{isInitialLoading}}"
+        class="gift-skeleton-list"
+        aria-label="正在加载{{collectionTitle}}"
+        aria-busy="true"
       >
-        <image
-          class="gift-image"
-          src="{{item.imagePath}}"
-          mode="aspectFill"
-          lazy-load="{{true}}"
-          fade-in="{{false}}"
-          data-id="{{item.id}}"
-          binderror="handleImageError"
-        ></image>
-      </view>
-      <view wx:else class="gift-image-wrap gift-placeholder" aria-hidden="true">
-        <view class="placeholder-gift">
-          <view class="placeholder-lid"></view>
-          <view class="placeholder-box"></view>
-          <view class="placeholder-ribbon"></view>
+        <view
+          class="gift-card gift-skeleton-card"
+          wx:for="{{loadingSkeletons}}"
+          wx:key="*this"
+        >
+          <view class="gift-skeleton-image gift-skeleton-block"></view>
+          <view class="gift-skeleton-info">
+            <view class="gift-skeleton-title gift-skeleton-block"></view>
+            <view class="gift-skeleton-line gift-skeleton-line-long gift-skeleton-block"></view>
+            <view class="gift-skeleton-line gift-skeleton-line-short gift-skeleton-block"></view>
+          </view>
         </view>
       </view>
 
-      <view class="gift-info" data-id="{{item.id}}" bindtap="openEditForm">
-        <view class="gift-title-row">
-          <text class="gift-name">{{item.displayName}}</text>
-          <text class="gift-date">{{item.dateText}}</text>
+      <view wx:if="{{!isInitialLoading && gifts.length}}" class="gift-list">
+        <collection-item-card
+          wx:for="{{gifts}}"
+          wx:key="id"
+          item="{{item}}"
+          collection-type="{{activeCollection}}"
+          emphasized="{{recentGiftId === item.id}}"
+          removing="{{removingGiftId === item.id}}"
+          bindpreview="previewImage"
+          bindedit="openEditForm"
+          bindimageerror="handleImageError"
+        ></collection-item-card>
+      </view>
+
+      <view wx:if="{{!isInitialLoading && gifts.length && hasMore}}" class="load-more" bindtap="loadMoreGifts">
+        <text>{{isLoadingMore ? '正在加载…' : '继续加载更多'}}</text>
+      </view>
+
+      <view wx:if="{{!isInitialLoading && !gifts.length}}" class="empty-state">
+        <view wx:if="{{activeCollection === 'gift'}}" class="empty-gift-icon" aria-hidden="true">
+          <view class="empty-gift-lid"></view>
+          <view class="empty-gift-box"></view>
+          <view class="empty-gift-ribbon"></view>
         </view>
-        <text wx:if="{{item.description}}" class="gift-description">{{item.description}}</text>
-        <view class="gift-edit-hint">
-          <text>查看与编辑</text>
-          <text class="gift-edit-arrow">›</text>
+        <view wx:else class="empty-house-icon" aria-hidden="true">
+          <view class="empty-house-roof"></view>
+          <view class="empty-house-body"></view>
+          <view class="empty-house-door"></view>
         </view>
+        <text class="empty-title">{{collectionEmptyTitle}}</text>
+        <button class="empty-add-button" bindtap="openCreateForm">{{collectionEmptyButton}}</button>
       </view>
     </view>
-  </view>
-
-  <view wx:if="{{!accessDenied && !isInitialLoading && gifts.length && hasMore}}" class="load-more" bindtap="loadMoreGifts">
-    <text>{{isLoadingMore ? '正在加载…' : '继续加载更多礼品'}}</text>
-  </view>
-
-  <view wx:if="{{!accessDenied && !isInitialLoading && !gifts.length}}" class="empty-state">
-    <view class="empty-gift-icon" aria-hidden="true">
-      <view class="empty-gift-lid"></view>
-      <view class="empty-gift-box"></view>
-      <view class="empty-gift-ribbon"></view>
-    </view>
-    <text class="empty-title">还没有收藏礼品</text>
-    <button class="empty-add-button" bindtap="openCreateForm">收藏第一件</button>
-  </view>
+  </scroll-view>
 
   <button
     wx:if="{{!accessDenied && !isInitialLoading && gifts.length}}"
     class="floating-add-button"
     bindtap="openCreateForm"
-    aria-label="收藏新礼品"
+    aria-label="{{collectionAddAria}}"
   >
     <!-- 使用几何线条绘制加号，避免系统字体基线造成视觉偏移 -->
     <view class="floating-add-icon" aria-hidden="true">
@@ -143,7 +153,7 @@
                 <view class="image-picker-plus-stroke image-picker-plus-stroke-horizontal"></view>
                 <view class="image-picker-plus-stroke image-picker-plus-stroke-vertical"></view>
               </view>
-              <text class="image-picker-label">为礼品添加一张图片</text>
+              <text class="image-picker-label">{{collectionImageLabel}}</text>
             </view>
             <view
               wx:if="{{form.imagePath}}"
@@ -156,14 +166,14 @@
 
           <view class="form-field">
             <view class="field-label-row">
-              <text class="field-label">礼品名称</text>
+              <text class="field-label">{{collectionNameLabel}}</text>
               <text class="field-optional">选填</text>
             </view>
             <input
               class="form-input"
               value="{{form.name}}"
-              disabled="{{isSaving || isDeleting}}"
-              placeholder="例如：手工陶瓷杯"
+              disabled="{{isSaving || isDeleting || isMoving}}"
+              placeholder="{{collectionNamePlaceholder}}"
               placeholder-class="form-placeholder"
               maxlength="40"
               confirm-type="next"
@@ -179,7 +189,7 @@
             <textarea
               class="form-textarea"
               value="{{form.description}}"
-              disabled="{{isSaving || isDeleting}}"
+              disabled="{{isSaving || isDeleting || isMoving}}"
               placeholder="记录款式、颜色或喜欢它的原因"
               placeholder-class="form-placeholder"
               maxlength="200"
@@ -190,11 +200,18 @@
         </view>
       </scroll-view>
 
+      <button
+        wx:if="{{isEditing}}"
+        class="move-button"
+        disabled="{{isSaving || isDeleting || isMoving}}"
+        bindtap="confirmMove"
+      >{{isMoving ? '正在移动…' : '移到' + moveTargetTitle}}</button>
+
       <view class="form-footer">
         <button
           wx:if="{{isEditing}}"
           class="delete-button"
-          disabled="{{isSaving || isDeleting}}"
+          disabled="{{isSaving || isDeleting || isMoving}}"
           bindtap="confirmDelete"
         >
           删除
@@ -204,7 +221,7 @@
           disabled="{{saveDisabled}}"
           bindtap="saveGift"
         >
-          保存到礼品夹
+          {{collectionSaveText}}
         </button>
       </view>
     </view>

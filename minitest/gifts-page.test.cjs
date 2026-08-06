@@ -22,7 +22,24 @@ const WXML_PATH = path.join(
   'gifts',
   'gifts.wxml'
 )
+const CARD_WXML_PATH = path.join(
+  __dirname,
+  '..',
+  'miniprogram',
+  'components',
+  'collection-item-card',
+  'collection-item-card.wxml'
+)
+const PAGE_JSON_PATH = path.join(
+  __dirname,
+  '..',
+  'miniprogram',
+  'pages',
+  'gifts',
+  'gifts.json'
+)
 const STORAGE_KEY = 'baby_gift_folder_v1'
+const DECOR_STORAGE_KEY = 'baby_decor_folder_v1'
 
 function setByPath(target, key, value) {
   const parts = key.split('.')
@@ -37,8 +54,11 @@ function setByPath(target, key, value) {
   current[parts[0]] = value
 }
 
-function createWxMock(initialGifts = []) {
-  const storage = new Map([[STORAGE_KEY, initialGifts]])
+function createWxMock(initialGifts = [], initialDecor = []) {
+  const storage = new Map([
+    [STORAGE_KEY, initialGifts],
+    [DECOR_STORAGE_KEY, initialDecor]
+  ])
   const toasts = []
   const actionSheets = []
   const modals = []
@@ -46,6 +66,7 @@ function createWxMock(initialGifts = []) {
   const imageEdits = []
   const saveRequests = []
   const removedSavedFiles = []
+  const pageScrolls = []
 
   return {
     storage,
@@ -56,6 +77,7 @@ function createWxMock(initialGifts = []) {
     imageEdits,
     saveRequests,
     removedSavedFiles,
+    pageScrolls,
     actionSheetTapIndex: undefined,
     modalConfirm: false,
     getStorageSync(key) {
@@ -89,6 +111,9 @@ function createWxMock(initialGifts = []) {
       }
     },
     navigateBack() {},
+    pageScrollTo(options) {
+      pageScrolls.push(options)
+    },
     getFileSystemManager() {
       return {
         saveFile(options) {
@@ -301,13 +326,105 @@ test('云端请求失败后结束骨架并回退本地缓存', async () => {
   assert.equal(wxMock.toasts.at(-1).title, '网络连接失败')
 })
 
+test('双分段懒加载装修好物并保持两区独立状态', async () => {
+  let giftRequests = 0
+  let decorRequests = 0
+  const wxMock = createWxMock()
+  const page = loadPage({
+    isConfigured: () => true,
+    listGifts: async () => {
+      giftRequests += 1
+      return {
+        items: [{
+          id: 'gift_cloud123',
+          name: '云端礼品',
+          description: '',
+          createdAt: 2,
+          updatedAt: 2
+        }],
+        total: 1,
+        hasMore: false,
+        nextCursor: ''
+      }
+    },
+    listDecorItems: async () => {
+      decorRequests += 1
+      return {
+        items: [{
+          id: 'decor_cloud123',
+          name: '胡桃木边几',
+          description: '',
+          createdAt: 3,
+          updatedAt: 3
+        }],
+        total: 1,
+        hasMore: false,
+        nextCursor: ''
+      }
+    }
+  }, wxMock)
+
+  page.onShow()
+  await waitForMicrotasks()
+  assert.equal(page.data.gifts[0].id, 'gift_cloud123')
+  assert.equal(decorRequests, 0)
+  page.handleListScroll({ detail: { scrollTop: 128 } })
+
+  page.switchCollection({ currentTarget: { dataset: { collection: 'decor' } } })
+  assert.equal(page.data.activeCollection, 'decor')
+  assert.equal(page.data.isInitialLoading, true)
+  assert.equal(page.data.listScrollTop, 0)
+  await waitForMicrotasks()
+
+  assert.equal(page.data.gifts[0].id, 'decor_cloud123')
+  assert.equal(page.data.collectionTitle, '装修好物')
+  assert.equal(wxMock.storage.get(DECOR_STORAGE_KEY)[0].id, 'decor_cloud123')
+  assert.equal(giftRequests, 1)
+  assert.equal(decorRequests, 1)
+  assert.equal(wxMock.pageScrolls.length, 0)
+
+  page.handleListScroll({ detail: { scrollTop: 42 } })
+  page.switchCollection({ currentTarget: { dataset: { collection: 'gift' } } })
+  assert.equal(page.data.gifts[0].id, 'gift_cloud123')
+  assert.equal(page.data.listScrollTop, 128)
+  assert.equal(giftRequests, 1)
+})
+
 test('礼品列表包含加载骨架、启用图片懒加载并关闭默认淡入', () => {
   const source = fs.readFileSync(WXML_PATH, 'utf8')
+  const cardSource = fs.readFileSync(CARD_WXML_PATH, 'utf8')
+  const styleSource = fs.readFileSync(WXML_PATH.replace(/\.wxml$/, '.wxss'), 'utf8')
 
   assert.match(source, /gift-skeleton-card/)
   assert.match(source, /isInitialLoading/)
-  assert.match(source, /lazy-load="\{\{true\}\}"/)
-  assert.match(source, /fade-in="\{\{false\}\}"/)
+  assert.match(source, /bindscrolltolower="loadMoreGifts"/)
+  assert.match(source, /<scroll-view[\s\S]*class="collection-list-scroll"/)
+  assert.match(styleSource, /\.collection-list-scroll\s*\{[\s\S]*height:\s*0;/)
+  assert.match(cardSource, /lazy-load="\{\{true\}\}"/)
+  assert.match(cardSource, /fade-in="\{\{false\}\}"/)
+})
+
+test('心愿夹包含双分段、滑动指示器和装修房屋占位图', () => {
+  const source = fs.readFileSync(WXML_PATH, 'utf8')
+  const cardSource = fs.readFileSync(CARD_WXML_PATH, 'utf8')
+
+  assert.match(source, /collection-segment-indicator/)
+  assert.match(source, /data-collection="gift"/)
+  assert.match(source, /data-collection="decor"/)
+  assert.match(source, /collection-item-card/)
+  assert.match(cardSource, /placeholder-house/)
+  assert.match(source, /我的心愿夹/)
+})
+
+test('礼品卡片组件引用可以从页面目录解析到完整组件文件', () => {
+  const pageConfig = JSON.parse(fs.readFileSync(PAGE_JSON_PATH, 'utf8'))
+  const componentReference = pageConfig.usingComponents['collection-item-card']
+  const componentBase = path.resolve(path.dirname(PAGE_JSON_PATH), componentReference)
+
+  assert.equal(componentReference, '../../components/collection-item-card/collection-item-card')
+  for (const extension of ['.js', '.json', '.wxml', '.wxss']) {
+    assert.equal(fs.existsSync(componentBase + extension), true, componentBase + extension)
+  }
 })
 
 test('图片表单由图片区触发选图，不显示选填和常驻来源按钮', () => {
@@ -560,6 +677,78 @@ test('仅文字礼品在云端成功后才进入页面与缓存', async () => {
   assert.equal(page.data.gifts.length, 1)
   assert.equal(wxMock.storage.get(STORAGE_KEY).length, 1)
   assert.equal(page.data.formVisible, false)
+})
+
+test('在装修分段新增时使用 decor ID、接口和独立缓存', async () => {
+  let received
+  const wxMock = createWxMock()
+  const page = loadPage({
+    isConfigured: () => true,
+    listGifts: async () => ({ items: [], total: 0, hasMore: false }),
+    listDecorItems: async () => ({ items: [], total: 0, hasMore: false }),
+    createDecorItem: async (item) => {
+      received = item
+      return Object.assign({}, item, {
+        total: 1,
+        createdAt: 10,
+        updatedAt: 10
+      })
+    }
+  }, wxMock)
+
+  page.onShow()
+  await waitForMicrotasks()
+  page.switchCollection({ currentTarget: { dataset: { collection: 'decor' } } })
+  await waitForMicrotasks()
+  page.openCreateForm()
+  page.handleNameInput({ detail: { value: '原木边几' } })
+  await page.saveGift()
+
+  assert.match(received.id, /^decor_/)
+  assert.equal(received.name, '原木边几')
+  assert.equal(page.data.gifts[0].id, received.id)
+  assert.equal(wxMock.storage.get(DECOR_STORAGE_KEY)[0].id, received.id)
+  assert.equal(wxMock.storage.get(STORAGE_KEY).length, 0)
+})
+
+test('编辑中的收藏项可以整体移动到另一分段', async () => {
+  const wxMock = createWxMock()
+  const cloudGift = {
+    id: 'gift_move1234',
+    name: '胡桃木边几',
+    description: '适合客厅',
+    imageKey: 'gift-folder/images/gift_move1234/image.jpg',
+    thumbnailKey: 'gift-folder/thumbnails/gift_move1234/thumb.jpg',
+    thumbnailUrl: 'https://cos.example/thumb.jpg',
+    createdAt: 10,
+    updatedAt: 10
+  }
+  const page = loadPage({
+    isConfigured: () => true,
+    listGifts: async () => ({ items: [cloudGift], total: 1, hasMore: false, nextCursor: '' }),
+    moveCollectionItem: async (id, targetCollection) => {
+      assert.equal(id, cloudGift.id)
+      assert.equal(targetCollection, 'decor')
+      return {
+        item: Object.assign({}, cloudGift, { updatedAt: 11 }),
+        sourceTotal: 0,
+        targetTotal: 1
+      }
+    }
+  }, wxMock)
+
+  page.onShow()
+  await waitForMicrotasks()
+  page.openEditForm({ detail: { id: cloudGift.id }, currentTarget: { dataset: {} } })
+  await page.moveCollectionItem(page.data.gifts[0], 'gift', 'decor')
+
+  assert.equal(page.data.activeCollection, 'decor')
+  assert.equal(page.data.isInitialLoading, false)
+  assert.equal(page.data.gifts[0].id, cloudGift.id)
+  assert.equal(page.collectionStates.gift.giftCount, 0)
+  assert.equal(page.collectionStates.decor.giftCount, 1)
+  assert.equal(wxMock.storage.get(STORAGE_KEY).length, 0)
+  assert.equal(wxMock.storage.get(DECOR_STORAGE_KEY)[0].id, cloudGift.id)
 })
 
 test('图片上传失败时保留表单且不调用礼品保存', async () => {

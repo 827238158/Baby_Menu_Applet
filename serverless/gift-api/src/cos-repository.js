@@ -47,6 +47,11 @@ function createCosRepository({
   const systemPrefix = prefix + '/system/'
   const indexKey = prefix + '/index.json'
   const mutationLockKey = systemPrefix + 'index.lock'
+  const decorPrefix = prefix + '/decor/'
+  const decorImagePrefix = decorPrefix + 'images/'
+  const decorThumbnailPrefix = decorPrefix + 'thumbnails/'
+  const decorIndexKey = decorPrefix + 'index.json'
+  const decorMutationLockKey = decorPrefix + 'system/index.lock'
 
   function giftKey(id) {
     return giftPrefix + id + '.json'
@@ -132,6 +137,14 @@ function createCosRepository({
 
   async function putIndex(index) {
     await putJson(indexKey, index)
+  }
+
+  async function getDecorIndex() {
+    return readJsonOrNull(decorIndexKey)
+  }
+
+  async function putDecorIndex(index) {
+    await putJson(decorIndexKey, index)
   }
 
   async function deleteObject(key) {
@@ -272,6 +285,35 @@ function createCosRepository({
     return true
   }
 
+  async function tryAcquireDecorMutationLock(lock) {
+    try {
+      await putJson(decorMutationLockKey, lock, {
+        'x-cos-forbid-overwrite': 'true'
+      })
+      return true
+    } catch (error) {
+      if (isAlreadyExists(error)) {
+        return false
+      }
+      throw error
+    }
+  }
+
+  async function getDecorMutationLock() {
+    return readJsonOrNull(decorMutationLockKey)
+  }
+
+  async function releaseDecorMutationLock(owner) {
+    const stored = await getDecorMutationLock()
+
+    if (!stored || stored.owner !== owner) {
+      return false
+    }
+
+    await deleteObject(decorMutationLockKey)
+    return true
+  }
+
   function isImageKeyForGift(key, id) {
     return typeof key === 'string' &&
       (key.startsWith(imagePrefix + id + '/') || key.startsWith(thumbnailPrefix + id + '/')) &&
@@ -284,6 +326,22 @@ function createCosRepository({
       !key.includes('..')
   }
 
+  function isDecorImageKeyForItem(key, id) {
+    return typeof key === 'string' &&
+      (key.startsWith(decorImagePrefix + id + '/') || key.startsWith(decorThumbnailPrefix + id + '/')) &&
+      !key.includes('..')
+  }
+
+  function isDecorImageKey(key) {
+    return typeof key === 'string' &&
+      (key.startsWith(decorImagePrefix) || key.startsWith(decorThumbnailPrefix)) &&
+      !key.includes('..')
+  }
+
+  function isCollectionImageKeyForItem(key, id) {
+    return isImageKeyForGift(key, id) || isDecorImageKeyForItem(key, id)
+  }
+
   async function listImageObjects() {
     const [images, thumbnails] = await Promise.all([
       listObjects(imagePrefix),
@@ -293,9 +351,20 @@ function createCosRepository({
     return images.concat(thumbnails)
   }
 
+  async function listDecorImageObjects() {
+    const [images, thumbnails] = await Promise.all([
+      listObjects(decorImagePrefix),
+      listObjects(decorThumbnailPrefix)
+    ])
+
+    return images.concat(thumbnails)
+  }
+
   return {
     deleteImage,
     getDownloadUrl,
+    getDecorIndex,
+    getDecorMutationLock,
     getFormUpload,
     getIndex,
     getImageInfo,
@@ -303,12 +372,19 @@ function createCosRepository({
     getUploadUrl,
     isImageKey,
     isImageKeyForGift,
+    isCollectionImageKeyForItem,
+    isDecorImageKey,
+    isDecorImageKeyForItem,
     isNotFoundError: isNotFound,
     listImageObjects,
+    listDecorImageObjects,
     listLegacyGifts,
     putIndex,
+    putDecorIndex,
+    releaseDecorMutationLock,
     releaseMutationLock,
-    tryAcquireMutationLock
+    tryAcquireMutationLock,
+    tryAcquireDecorMutationLock
   }
 }
 

@@ -79,7 +79,7 @@ function createGiftApi(wxApi, config = giftCloudConfig) {
 
     if (!isConfigured()) {
       return Promise.reject(
-        createApiError('CLOUD_NOT_CONFIGURED', '礼品云端尚未配置')
+        createApiError('CLOUD_NOT_CONFIGURED', '心愿夹云端尚未配置')
       )
     }
 
@@ -227,22 +227,24 @@ function createGiftApi(wxApi, config = giftCloudConfig) {
     })
   }
 
-  async function uploadImage(filePath, giftId, asset = 'image') {
+  async function uploadImage(filePath, itemId, asset = 'image', collection = 'gift') {
     const file = await getFileInfo(filePath)
 
     if (!file.size || file.size > 8 * 1024 * 1024) {
       throw createApiError('IMAGE_TOO_LARGE', '图片大小不能超过 8MB')
     }
 
+    const isDecor = collection === 'decor'
     const upload = await authorizedRequest({
-      path: '/uploads/form-policy',
+      path: isDecor
+        ? '/collections/decor/uploads/form-policy'
+        : '/uploads/form-policy',
       method: 'POST',
-      data: {
-        giftId,
+      data: Object.assign({
         contentType: file.contentType,
         size: file.size,
         asset
-      }
+      }, isDecor ? { itemId } : { giftId: itemId })
     })
     await postImage(upload, filePath)
     return upload.imageKey
@@ -279,6 +281,43 @@ function createGiftApi(wxApi, config = giftCloudConfig) {
     getGiftImage(id) {
       return authorizedRequest({ path: '/gifts/' + encodeURIComponent(id) + '/image' })
     },
+    listDecorItems(cursor = '', limit = 20) {
+      const query = '?limit=' + encodeURIComponent(limit) +
+        (cursor ? '&cursor=' + encodeURIComponent(cursor) : '')
+      return authorizedRequest({ path: '/collections/decor/items' + query })
+    },
+    createDecorItem(item) {
+      return authorizedRequest({
+        path: '/collections/decor/items',
+        method: 'POST',
+        data: item
+      })
+    },
+    updateDecorItem(item) {
+      return authorizedRequest({
+        path: '/collections/decor/items/' + encodeURIComponent(item.id),
+        method: 'PUT',
+        data: item
+      })
+    },
+    deleteDecorItem(id) {
+      return authorizedRequest({
+        path: '/collections/decor/items/' + encodeURIComponent(id),
+        method: 'DELETE'
+      })
+    },
+    getDecorImage(id) {
+      return authorizedRequest({
+        path: '/collections/decor/items/' + encodeURIComponent(id) + '/image'
+      })
+    },
+    moveCollectionItem(id, targetCollection) {
+      return authorizedRequest({
+        path: '/collections/items/' + encodeURIComponent(id) + '/move',
+        method: 'POST',
+        data: { targetCollection }
+      })
+    },
     deleteOrphan(imageKey) {
       return authorizedRequest({
         path: '/uploads/orphan',
@@ -287,19 +326,30 @@ function createGiftApi(wxApi, config = giftCloudConfig) {
       })
     },
     uploadImage,
-    async uploadImages(originalPath, thumbnailPath, giftId) {
-      const imageKey = await uploadImage(originalPath, giftId, 'image')
+    async uploadImages(originalPath, thumbnailPath, itemId, collection = 'gift') {
+      const imageKey = await uploadImage(originalPath, itemId, 'image', collection)
       try {
-        const thumbnailKey = await uploadImage(thumbnailPath, giftId, 'thumbnail')
+        const thumbnailKey = await uploadImage(thumbnailPath, itemId, 'thumbnail', collection)
         return { imageKey, thumbnailKey }
       } catch (error) {
         authorizedRequest({
-          path: '/uploads/orphan',
+          path: collection === 'decor'
+            ? '/collections/decor/uploads/orphan'
+            : '/uploads/orphan',
           method: 'DELETE',
           data: { imageKey }
         }).catch(() => {})
         throw error
       }
+    },
+    deleteCollectionOrphan(imageKey, collection = 'gift') {
+      return authorizedRequest({
+        path: collection === 'decor'
+          ? '/collections/decor/uploads/orphan'
+          : '/uploads/orphan',
+        method: 'DELETE',
+        data: { imageKey }
+      })
     }
   }
 }

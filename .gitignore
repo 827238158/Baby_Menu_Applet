@@ -9,10 +9,10 @@ serverless/gift-api/*.zip
 serverless/gift-api/.env
 小程序截图.jpg
 
-# Local Agent/Codex workspace files
-.codex/
-memory/
-AGENTS.md
+# # Local Agent/Codex workspace files
+# .codex/
+# memory/
+# AGENTS.md
 
 # WeChat DevTools local private config
 project.private.config.json
