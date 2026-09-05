@@ -255,32 +255,165 @@ test('图片上传失败时返回明确错误，不会继续保存礼品', async
   )
 })
 
-test('缩略图上传失败时等待孤儿原图清理完成再返回错误', async () => {
+test('原图只上传一次，随后请求数据万象生成礼品缩略图', async () => {
+  const imageKey = 'gift-folder/images/gift_12345678/original.jpg'
+  const thumbnailKey = 'gift-folder/thumbnails/gift_12345678/original.webp'
+  const wxMock = createWxMock((options) => {
+    if (options.url.endsWith('/uploads/form-policy')) {
+      assert.equal(options.data.asset, 'image')
+      options.success({
+        statusCode: 200,
+        data: {
+          data: {
+            imageKey,
+            uploadUrl: 'https://bucket.cos.example/',
+            contentType: 'image/jpeg',
+            formData: { key: imageKey }
+          }
+        }
+      })
+      return
+    }
+
+    if (options.url.endsWith('/uploads/thumbnail')) {
+      assert.equal(options.method, 'POST')
+      assert.deepEqual(options.data, {
+        giftId: 'gift_12345678',
+        imageKey
+      })
+      options.success({
+        statusCode: 200,
+        data: { data: { thumbnailKey } }
+      })
+    }
+  }, { session: validSession() })
+  const api = giftApiModule.createGiftApi(wxMock, {
+    apiBaseUrl: 'https://gift.example'
+  })
+
+  const uploaded = await api.uploadImages(
+    'wxfile://original.jpg',
+    'gift_12345678'
+  )
+
+  assert.deepEqual(uploaded, { imageKey, thumbnailKey })
+  assert.equal(wxMock.uploads.length, 1)
+  assert.equal(wxMock.uploads[0].filePath, 'wxfile://original.jpg')
+})
+
+test('装修原图上传后调用独立的缩略图生成路由', async () => {
+  const imageKey = 'gift-folder/decor/images/decor_12345678/original.png'
+  const thumbnailKey = 'gift-folder/decor/thumbnails/decor_12345678/original.webp'
+  const wxMock = createWxMock((options) => {
+    if (options.url.endsWith('/collections/decor/uploads/form-policy')) {
+      assert.equal(options.data.asset, 'image')
+      assert.equal(options.data.itemId, 'decor_12345678')
+      options.success({
+        statusCode: 200,
+        data: {
+          data: {
+            imageKey,
+            uploadUrl: 'https://bucket.cos.example/',
+            contentType: 'image/png',
+            formData: { key: imageKey }
+          }
+        }
+      })
+      return
+    }
+
+    if (options.url.endsWith('/collections/decor/uploads/thumbnail')) {
+      assert.equal(options.method, 'POST')
+      assert.deepEqual(options.data, {
+        itemId: 'decor_12345678',
+        imageKey
+      })
+      options.success({
+        statusCode: 200,
+        data: { data: { thumbnailKey } }
+      })
+    }
+  }, { session: validSession(), imageType: 'png' })
+  const api = giftApiModule.createGiftApi(wxMock, {
+    apiBaseUrl: 'https://gift.example'
+  })
+
+  const uploaded = await api.uploadImages(
+    'wxfile://decor.png',
+    'decor_12345678',
+    'decor'
+  )
+
+  assert.deepEqual(uploaded, { imageKey, thumbnailKey })
+  assert.equal(wxMock.uploads.length, 1)
+})
+
+test('缩略图接口成功但缺少 Key 时清理原图并拒绝保存', async () => {
+  const imageKey = 'gift-folder/images/gift_12345678/original.jpg'
+  let cleanupRequested = false
+  const wxMock = createWxMock((options) => {
+    if (options.url.endsWith('/uploads/form-policy')) {
+      options.success({
+        statusCode: 200,
+        data: {
+          data: {
+            imageKey,
+            uploadUrl: 'https://bucket.cos.example/',
+            contentType: 'image/jpeg',
+            formData: { key: imageKey }
+          }
+        }
+      })
+      return
+    }
+
+    if (options.url.endsWith('/uploads/thumbnail')) {
+      options.success({ statusCode: 200, data: { data: {} } })
+      return
+    }
+
+    if (options.url.endsWith('/uploads/orphan')) {
+      cleanupRequested = true
+      options.success({ statusCode: 200, data: { data: { imageKey } } })
+    }
+  }, { session: validSession() })
+  const api = giftApiModule.createGiftApi(wxMock, {
+    apiBaseUrl: 'https://gift.example'
+  })
+
+  await assert.rejects(
+    api.uploadImages('wxfile://original.jpg', 'gift_12345678'),
+    (error) => error.code === 'THUMBNAIL_PROCESSING_INVALID_RESPONSE'
+  )
+  assert.equal(cleanupRequested, true)
+})
+
+test('缩略图生成失败时等待孤儿原图清理完成再返回原错误', async () => {
   const imageKey = 'gift-folder/images/gift_12345678/original.jpg'
   let cleanupRequest
   const wxMock = createWxMock((options) => {
     if (options.url.endsWith('/uploads/form-policy')) {
-      if (options.data.asset === 'image') {
-        options.success({
-          statusCode: 200,
+      options.success({
+        statusCode: 200,
+        data: {
           data: {
-            data: {
-              imageKey,
-              uploadUrl: 'https://bucket.cos.example/',
-              contentType: 'image/jpeg',
-              formData: { key: imageKey }
-            }
+            imageKey,
+            uploadUrl: 'https://bucket.cos.example/',
+            contentType: 'image/jpeg',
+            formData: { key: imageKey }
           }
-        })
-        return
-      }
+        }
+      })
+      return
+    }
 
+    if (options.url.endsWith('/uploads/thumbnail')) {
       options.success({
         statusCode: 503,
         data: {
           error: {
-            code: 'THUMBNAIL_UPLOAD_FAILED',
-            message: '缩略图上传失败'
+            code: 'THUMBNAIL_PROCESSING_UNAVAILABLE',
+            message: '缩略图生成失败'
           }
         }
       })
@@ -298,7 +431,6 @@ test('缩略图上传失败时等待孤儿原图清理完成再返回错误', as
   let settled = false
   const uploadPromise = api.uploadImages(
     'wxfile://original.jpg',
-    'wxfile://thumbnail.jpg',
     'gift_12345678'
   )
   uploadPromise.then(
@@ -318,8 +450,61 @@ test('缩略图上传失败时等待孤儿原图清理完成再返回错误', as
   })
   await assert.rejects(
     uploadPromise,
-    (error) => error.code === 'THUMBNAIL_UPLOAD_FAILED'
+    (error) => error.code === 'THUMBNAIL_PROCESSING_UNAVAILABLE'
   )
+})
+
+test('装修缩略图生成失败时使用 decor 孤儿清理路由', async () => {
+  const imageKey = 'gift-folder/decor/images/decor_12345678/original.jpg'
+  const requests = []
+  const wxMock = createWxMock((options) => {
+    requests.push(options)
+    if (options.url.endsWith('/collections/decor/uploads/form-policy')) {
+      options.success({
+        statusCode: 200,
+        data: {
+          data: {
+            imageKey,
+            uploadUrl: 'https://bucket.cos.example/',
+            contentType: 'image/jpeg',
+            formData: { key: imageKey }
+          }
+        }
+      })
+      return
+    }
+
+    if (options.url.endsWith('/collections/decor/uploads/thumbnail')) {
+      options.success({
+        statusCode: 503,
+        data: {
+          error: {
+            code: 'THUMBNAIL_PROCESSING_UNAVAILABLE',
+            message: '缩略图生成失败'
+          }
+        }
+      })
+      return
+    }
+
+    if (options.url.endsWith('/collections/decor/uploads/orphan')) {
+      options.success({ statusCode: 200, data: { data: { imageKey } } })
+    }
+  }, { session: validSession() })
+  const api = giftApiModule.createGiftApi(wxMock, {
+    apiBaseUrl: 'https://gift.example'
+  })
+
+  await assert.rejects(
+    api.uploadImages('wxfile://decor.jpg', 'decor_12345678', 'decor'),
+    (error) => error.code === 'THUMBNAIL_PROCESSING_UNAVAILABLE'
+  )
+  const cleanup = requests.find((item) => (
+    item.url.endsWith('/collections/decor/uploads/orphan')
+  ))
+  assert.ok(cleanup)
+  assert.equal(cleanup.method, 'DELETE')
+  assert.equal(cleanup.data.imageKey, imageKey)
 })
 
 test('未配置函数 URL 时不会发起网络请求', async () => {

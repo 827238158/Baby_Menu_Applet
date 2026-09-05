@@ -2,6 +2,8 @@
 
 const crypto = require('node:crypto')
 
+const PERSISTENT_THUMBNAIL_RULE = 'imageMogr2/auto-orient/thumbnail/800x800>/strip/format/webp/quality/75'
+
 function callCos(cos, method, params) {
   return new Promise((resolve, reject) => {
     cos[method](params, (error, data) => {
@@ -170,6 +172,28 @@ function createCosRepository({
       size: Number(result.headers && result.headers['content-length']) || 0,
       contentType: String(result.headers && result.headers['content-type'] || '').toLowerCase()
     }
+  }
+
+  async function createPersistentThumbnail(imageKey, thumbnailKey) {
+    // fileid 使用桶内绝对路径，避免结果被保存到原图所在目录的相对路径下。
+    const picOperations = JSON.stringify({
+      is_pic_info: 0,
+      rules: [{
+        fileid: '/' + thumbnailKey,
+        rule: PERSISTENT_THUMBNAIL_RULE
+      }]
+    })
+
+    return callCos(cos, 'request', {
+      Bucket: bucket,
+      Region: region,
+      Key: imageKey,
+      Method: 'POST',
+      Action: 'image_process',
+      Headers: {
+        'Pic-Operations': picOperations
+      }
+    })
   }
 
   function getSignedUrl(key, method, expires) {
@@ -361,6 +385,7 @@ function createCosRepository({
   }
 
   return {
+    createPersistentThumbnail,
     deleteImage,
     getDownloadUrl,
     getDecorIndex,
@@ -389,6 +414,7 @@ function createCosRepository({
 }
 
 module.exports = {
+  PERSISTENT_THUMBNAIL_RULE,
   createCosRepository,
   isAlreadyExists,
   isNotFound

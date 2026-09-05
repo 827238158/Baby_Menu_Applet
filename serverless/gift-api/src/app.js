@@ -157,6 +157,25 @@ function createApp({
     return parseBody(event, config.maxJsonBodyBytes || 8 * 1024)
   }
 
+  function derivePersistentThumbnailKey(imageKey, itemId, collection) {
+    const collectionPrefix = collection === 'decor' ? '/decor' : ''
+    const imagePrefix = config.cosPrefix + collectionPrefix + '/images/' + itemId + '/'
+
+    // 新接口只接受当前分段、当前收藏项 images 目录中的直接子对象。
+    if (!imageKey.startsWith(imagePrefix) || imageKey.includes('..')) {
+      throw new HttpError(400, 'INVALID_IMAGE_KEY', '原图路径无效')
+    }
+
+    const filename = imageKey.slice(imagePrefix.length)
+    const extensionOffset = filename.lastIndexOf('.')
+    if (!filename || filename.includes('/') || extensionOffset <= 0 || extensionOffset === filename.length - 1) {
+      throw new HttpError(400, 'INVALID_IMAGE_KEY', '原图路径无效')
+    }
+
+    const basename = filename.slice(0, extensionOffset)
+    return config.cosPrefix + collectionPrefix + '/thumbnails/' + itemId + '/' + basename + '.webp'
+  }
+
   function requireUser(event) {
     const authorization = getHeader(event.headers, 'authorization')
     const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : ''
@@ -230,6 +249,67 @@ function createApp({
 
     if (!info.size || info.size > config.maxImageBytes) {
       throw new HttpError(400, 'IMAGE_TOO_LARGE', '图片大小不能超过 8MB')
+    }
+  }
+
+  function isValidPersistentThumbnail(info) {
+    return Boolean(info &&
+      info.contentType === 'image/webp' &&
+      info.size > 0 &&
+      info.size <= config.maxImageBytes)
+  }
+
+  async function createPersistentThumbnail(event, collection) {
+    const body = bodyOf(event)
+    const idField = collection === 'decor' ? 'itemId' : 'giftId'
+    const itemId = validateCollectionItemId(body[idField])
+    const imageKey = String(body.imageKey || '')
+    const thumbnailKey = derivePersistentThumbnailKey(imageKey, itemId, collection)
+
+    let sourceInfo
+    try {
+      sourceInfo = await repository.getImageInfo(imageKey)
+    } catch (error) {
+      if (repository.isNotFoundError(error)) {
+        throw new HttpError(400, 'IMAGE_NOT_FOUND', '上传的原图不存在')
+      }
+      logger.error('COS 原图校验失败', { collection, itemId, imageKey, error })
+      throw new HttpError(503, 'THUMBNAIL_PROCESSING_UNAVAILABLE', '缩略图生成暂时不可用，请稍后重试')
+    }
+
+    if (!IMAGE_TYPES.has(sourceInfo.contentType)) {
+      throw new HttpError(400, 'INVALID_IMAGE_TYPE', '图片格式不受支持')
+    }
+    if (!sourceInfo.size || sourceInfo.size > config.maxImageBytes) {
+      throw new HttpError(400, 'IMAGE_TOO_LARGE', '图片大小不能超过 8MB')
+    }
+
+    try {
+      const existing = await repository.getImageInfo(thumbnailKey)
+      if (isValidPersistentThumbnail(existing)) {
+        return success({ thumbnailKey })
+      }
+    } catch (error) {
+      if (!repository.isNotFoundError(error)) {
+        logger.error('COS 缩略图幂等校验失败', { collection, itemId, thumbnailKey, error })
+        throw new HttpError(503, 'THUMBNAIL_PROCESSING_UNAVAILABLE', '缩略图生成暂时不可用，请稍后重试')
+      }
+    }
+
+    try {
+      await repository.createPersistentThumbnail(imageKey, thumbnailKey)
+      const generated = await repository.getImageInfo(thumbnailKey)
+      if (!isValidPersistentThumbnail(generated)) {
+        throw new Error('数据万象返回的缩略图格式或大小无效')
+      }
+      return success({ thumbnailKey })
+    } catch (error) {
+      // CI 失败后尽力删除确定性输出，避免半成品被后续请求误判为有效缩略图。
+      await repository.deleteImage(thumbnailKey).catch((cleanupError) => {
+        logger.warn('异常缩略图清理失败', { collection, itemId, thumbnailKey, error: cleanupError })
+      })
+      logger.error('数据万象持久化缩略图生成失败', { collection, itemId, imageKey, thumbnailKey, error })
+      throw new HttpError(503, 'THUMBNAIL_PROCESSING_UNAVAILABLE', '缩略图生成暂时不可用，请稍后重试')
     }
   }
 
@@ -1233,6 +1313,9 @@ function createApp({
       if (method === 'POST' && path === '/uploads/form-policy') {
         return await createFormUpload(event)
       }
+      if (method === 'POST' && path === '/uploads/thumbnail') {
+        return await createPersistentThumbnail(event, 'gift')
+      }
       if (method === 'POST' && path === '/uploads/presign') {
         return await createLegacyUpload(event)
       }
@@ -1268,6 +1351,9 @@ function createApp({
 
       if (method === 'POST' && path === '/collections/decor/uploads/form-policy') {
         return await createDecorFormUpload(event)
+      }
+      if (method === 'POST' && path === '/collections/decor/uploads/thumbnail') {
+        return await createPersistentThumbnail(event, 'decor')
       }
       if (method === 'DELETE' && path === '/collections/decor/uploads/orphan') {
         return await deleteDecorOrphan(event)

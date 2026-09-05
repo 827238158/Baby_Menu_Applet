@@ -71,7 +71,9 @@ tar.exe -tf gift-api.zip | Select-String -Pattern '^(index.js|src/app.js|package
 
 ## SCF 部署后验证
 
-上传前先备份生产 `index.json` 和 `gifts/` 前缀，确认 COS 版本控制已暂停、角色已增加 `cos:PostObject`、COS 域名已加入微信 `uploadFile` 合法域名。完整兼容发布顺序见 `serverless/gift-api/README.md`。
+上传前先备份生产两份 `index.json` 和礼品、装修好物的图片前缀，确认 COS 版本控制已暂停、目标桶已绑定数据万象；复核 SCF 角色具有 `cos:GetBucket`、`cos:GetObject`、`cos:HeadObject`、`cos:PutObject`、`cos:PostObject`、`cos:DeleteObject`，SCF/COS 域名分别加入微信 `request`、`uploadFile`、`downloadFile` 合法域名。完整兼容发布顺序见 `serverless/gift-api/README.md`。
+
+缩略图迁移必须先部署兼容版 SCF，再发布新版小程序。SCF 需同时支持 `POST /uploads/thumbnail`、`POST /collections/decor/uploads/thumbnail` 和旧客户端 `asset: thumbnail` 表单直传；后端未验证前不要发布只上传原图的前端。
 
 上传 ZIP 并完成部署后，不要只检查控制台显示成功，还要在真机验证实际路由：
 
@@ -79,12 +81,13 @@ tar.exe -tf gift-api.zip | Select-String -Pattern '^(index.js|src/app.js|package
 2. 进入心愿夹，确认“礼品夹 / 装修好物”分段切换和列表缩略图可以加载。
 3. 点击一张有原图的礼品图片进入全屏预览。
 4. 确认 `GET /gifts/{id}/image` 不再返回“接口不存在”，并能加载对应原图。
-5. 分别从相册和相机选图；拍照后应进入微信图片编辑，确认后由 `wx.uploadFile` POST Object 直传。
+5. 分别从相册和相机选图；拍照后应进入微信图片编辑，新版每次选图只由 `wx.uploadFile` POST Object 直传一份原图，再由 SCF 调用数据万象持久化生成缩略图。
 6. 预览图左上角圆形叉号不变形；点击后取消应保留，确认后只移除草稿图片。
 7. 用两名用户并发新增/编辑，并在 21 条以上数据中续载，确认无丢失、重复或跳项。
-8. 在礼品夹和装修好物分别完成新增、编辑、删除、缩略图和原图预览，确认两区不串数据。
+8. 在礼品夹和装修好物分别完成新增、编辑、删除、缩略图和原图预览，确认两区不串数据；新缩略图必须为 WebP、最长边不超过 800px、方向正确且不含 EXIF。
 9. 分别把一件有图收藏从礼品夹移到装修好物、再移回，确认 ID、图片、名称和简介不变，目标数量正确，重复提交移动请求不产生重复数据。
 10. 创建 `GiftImageCleanupDaily` Timer 并执行控制台测试；日志应包含 `gift` / `decor` 分项和总计，且不删除任一区在用、移动后仍被引用或不足 24 小时的图片。
+11. 在数据万象控制台检查“基础图片处理”新增对应使用量，并观察 SCF 错误日志、COS 对象和外网流量；模拟处理失败时应阻止保存，且前端等待原图清理完成后才提示原始错误。
 
 2026-07-29 已完成一次新版 ZIP 部署，原图接口真机功能验证正常。
 
@@ -127,5 +130,5 @@ tar.exe -tf gift-api.zip | Select-String -Pattern '^(index.js|src/app.js|package
 - 两名授权用户能互相看到新增、编辑和删除结果。
 - 未授权账号进入心愿夹时提示无权限并返回。
 - 仅文字、仅图片和图片加文字均可保存。
-- 图片直传 COS，加载失败时可以回退到微信临时下载路径。
+- 新图片只直传原图到 COS，由 SCF 调用数据万象持久化生成 WebP 缩略图；加载失败时仍可回退到微信临时下载路径。
 - 礼品图片可从相机或相册选择；拍照后可编辑，预览叉号需二次确认；列表续载、全屏预览按需加载原图、点击图片退出与退出按钮均正常。

@@ -240,7 +240,6 @@ Page({
 
   onLoad() {
     this.pendingImagePath = ''
-    this.pendingThumbnailPath = ''
     this.accessDenied = false
     this.hasLoaded = false
     this.isLoadingGifts = false
@@ -515,7 +514,6 @@ Page({
 
     this.invalidateImageSelection()
     this.pendingImagePath = ''
-    this.pendingThumbnailPath = ''
     this.formCollection = collection
     this.setData({
       formVisible: true,
@@ -555,7 +553,6 @@ Page({
 
     this.invalidateImageSelection()
     this.pendingImagePath = ''
-    this.pendingThumbnailPath = ''
     this.formCollection = this.data.activeCollection
     this.setData({
       formVisible: true,
@@ -784,16 +781,10 @@ Page({
           return
         }
         this.cleanupPendingImage()
-        this.createThumbnail(result.savedFilePath, (thumbnailPath) => {
-          if (!this.isImageSelectionActive(generation)) {
-            this.removeSavedFile(result.savedFilePath)
-            return
-          }
-          this.pendingImagePath = result.savedFilePath
-          this.pendingThumbnailPath = thumbnailPath
-          this.setData({ 'form.imagePath': result.savedFilePath })
-          this.updateSaveState()
-        })
+        // 表单直接预览已保存的本地原图，云端缩略图在点击保存后生成。
+        this.pendingImagePath = result.savedFilePath
+        this.setData({ 'form.imagePath': result.savedFilePath })
+        this.updateSaveState()
       },
       fail: () => {
         if (!this.isImageSelectionActive(generation)) return
@@ -802,21 +793,6 @@ Page({
           icon: 'none'
         })
       }
-    })
-  },
-
-  createThumbnail(filePath, success) {
-    // 原图只供全屏查看，列表使用微信原生压缩后的缩略图降低下行流量。
-    if (!wx.compressImage) {
-      success(filePath)
-      return
-    }
-
-    wx.compressImage({
-      src: filePath,
-      quality: 65,
-      success: (result) => success(result.tempFilePath || filePath),
-      fail: () => success(filePath)
     })
   },
 
@@ -922,7 +898,6 @@ Page({
       if (hasNewImage) {
         const uploaded = await giftApi.uploadImages(
           this.pendingImagePath,
-          this.pendingThumbnailPath || this.pendingImagePath,
           id,
           collection
         )
@@ -1277,7 +1252,6 @@ Page({
       this.removeSavedFile(this.pendingImagePath)
       this.pendingImagePath = ''
     }
-    this.pendingThumbnailPath = ''
   },
 
   invalidateImageSelection() {

@@ -4,16 +4,18 @@ const assert = require('node:assert/strict')
 const test = require('node:test')
 
 const { createApp } = require('../src/app')
-const { createCosRepository } = require('../src/cos-repository')
+const { PERSISTENT_THUMBNAIL_RULE, createCosRepository } = require('../src/cos-repository')
 const { createTokenService } = require('../src/token-service')
 
 const OPEN_ID = 'openid-authorized-user'
 const GIFT_ID = 'gift_12345678'
 const IMAGE_KEY = 'gift-folder/images/' + GIFT_ID + '/image.jpg'
 const THUMBNAIL_KEY = 'gift-folder/thumbnails/' + GIFT_ID + '/thumbnail.jpg'
+const PERSISTENT_THUMBNAIL_KEY = 'gift-folder/thumbnails/' + GIFT_ID + '/image.webp'
 const DECOR_ID = 'decor_12345678'
 const DECOR_IMAGE_KEY = 'gift-folder/decor/images/' + DECOR_ID + '/image.jpg'
 const DECOR_THUMBNAIL_KEY = 'gift-folder/decor/thumbnails/' + DECOR_ID + '/thumbnail.jpg'
+const DECOR_PERSISTENT_THUMBNAIL_KEY = 'gift-folder/decor/thumbnails/' + DECOR_ID + '/image.webp'
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value))
@@ -35,12 +37,15 @@ function createRepository() {
   let putIndexDelay = 0
   let imageObjects = []
   let decorImageObjects = []
+  let thumbnailProcessingError = null
+  let thumbnailProcessingInfo = { size: 320, contentType: 'image/webp' }
 
   return {
     deletedImages,
     imageInfo,
     legacyGifts,
     formUploadCalls: [],
+    thumbnailProcessingCalls: [],
     get index() {
       return clone(index)
     },
@@ -65,8 +70,20 @@ function createRepository() {
     set mutationLock(value) {
       lock = clone(value)
     },
+    set thumbnailProcessingError(value) {
+      thumbnailProcessingError = value
+    },
+    set thumbnailProcessingInfo(value) {
+      thumbnailProcessingInfo = clone(value)
+    },
+    async createPersistentThumbnail(imageKey, thumbnailKey) {
+      this.thumbnailProcessingCalls.push({ imageKey, thumbnailKey })
+      if (thumbnailProcessingError) throw thumbnailProcessingError
+      imageInfo.set(thumbnailKey, clone(thumbnailProcessingInfo))
+    },
     async deleteImage(key) {
       deletedImages.push(key)
+      imageInfo.delete(key)
     },
     async getDownloadUrl(key) {
       return 'https://cos.example/' + key + '?signed=1'
@@ -499,6 +516,135 @@ test('POST Object 策略绑定实际键、类型和精确字节数', async () =>
   assert.ok(policy.conditions.some((condition) => Array.isArray(condition) && condition.join('|') === 'eq|$Content-Type|image/jpeg'))
   assert.ok(policy.conditions.some((condition) => Array.isArray(condition) && condition.join('|') === 'eq|$x-cos-security-token|session-token'))
   assert.equal(signed.formData['x-cos-security-token'], 'session-token')
+})
+
+test('礼品和装修好物可从原图持久化生成确定性 WebP 缩略图', async () => {
+  const fixture = createFixture()
+
+  const giftResult = await fixture.app(request('POST', '/uploads/thumbnail', {
+    giftId: GIFT_ID,
+    imageKey: IMAGE_KEY
+  }, fixture.token))
+  assert.equal(giftResult.statusCode, 200)
+  assert.equal(bodyOf(giftResult).data.thumbnailKey, PERSISTENT_THUMBNAIL_KEY)
+
+  const decorResult = await fixture.app(request('POST', '/collections/decor/uploads/thumbnail', {
+    itemId: DECOR_ID,
+    imageKey: DECOR_IMAGE_KEY
+  }, fixture.token))
+  assert.equal(decorResult.statusCode, 200)
+  assert.equal(bodyOf(decorResult).data.thumbnailKey, DECOR_PERSISTENT_THUMBNAIL_KEY)
+  assert.deepEqual(fixture.repository.thumbnailProcessingCalls, [
+    { imageKey: IMAGE_KEY, thumbnailKey: PERSISTENT_THUMBNAIL_KEY },
+    { imageKey: DECOR_IMAGE_KEY, thumbnailKey: DECOR_PERSISTENT_THUMBNAIL_KEY }
+  ])
+})
+
+test('持久化缩略图接口要求鉴权并严格限制原图命名空间', async () => {
+  const fixture = createFixture()
+  const unauthorized = await fixture.app(request('POST', '/uploads/thumbnail', {
+    giftId: GIFT_ID,
+    imageKey: IMAGE_KEY
+  }))
+  assert.equal(unauthorized.statusCode, 401)
+
+  const invalidCases = [
+    ['/uploads/thumbnail', { giftId: GIFT_ID, imageKey: THUMBNAIL_KEY }],
+    ['/uploads/thumbnail', {
+      giftId: GIFT_ID,
+      imageKey: 'gift-folder/images/gift_other0001/image.jpg'
+    }],
+    ['/collections/decor/uploads/thumbnail', { itemId: DECOR_ID, imageKey: IMAGE_KEY }]
+  ]
+  for (const [path, payload] of invalidCases) {
+    const result = await fixture.app(request('POST', path, payload, fixture.token))
+    assert.equal(result.statusCode, 400)
+    assert.equal(bodyOf(result).error.code, 'INVALID_IMAGE_KEY')
+  }
+
+  const missing = await fixture.app(request('POST', '/uploads/thumbnail', {
+    giftId: GIFT_ID,
+    imageKey: 'gift-folder/images/' + GIFT_ID + '/missing.jpg'
+  }, fixture.token))
+  assert.equal(missing.statusCode, 400)
+  assert.equal(bodyOf(missing).error.code, 'IMAGE_NOT_FOUND')
+})
+
+test('持久化缩略图生成失败或产物异常时统一返回 503 并清理输出', async () => {
+  const processingFailure = createFixture()
+  processingFailure.repository.thumbnailProcessingError = new Error('CI unavailable')
+  const failed = await processingFailure.app(request('POST', '/uploads/thumbnail', {
+    giftId: GIFT_ID,
+    imageKey: IMAGE_KEY
+  }, processingFailure.token))
+  assert.equal(failed.statusCode, 503)
+  assert.equal(bodyOf(failed).error.code, 'THUMBNAIL_PROCESSING_UNAVAILABLE')
+  assert.deepEqual(processingFailure.repository.deletedImages, [PERSISTENT_THUMBNAIL_KEY])
+
+  const invalidOutput = createFixture()
+  invalidOutput.repository.thumbnailProcessingInfo = { size: 320, contentType: 'image/jpeg' }
+  const rejected = await invalidOutput.app(request('POST', '/uploads/thumbnail', {
+    giftId: GIFT_ID,
+    imageKey: IMAGE_KEY
+  }, invalidOutput.token))
+  assert.equal(rejected.statusCode, 503)
+  assert.equal(bodyOf(rejected).error.code, 'THUMBNAIL_PROCESSING_UNAVAILABLE')
+  assert.deepEqual(invalidOutput.repository.deletedImages, [PERSISTENT_THUMBNAIL_KEY])
+})
+
+test('已存在有效 WebP 缩略图时直接返回且不重复调用数据万象', async () => {
+  const fixture = createFixture()
+  fixture.repository.imageInfo.set(PERSISTENT_THUMBNAIL_KEY, {
+    size: 320,
+    contentType: 'image/webp'
+  })
+
+  const result = await fixture.app(request('POST', '/uploads/thumbnail', {
+    giftId: GIFT_ID,
+    imageKey: IMAGE_KEY
+  }, fixture.token))
+  assert.equal(result.statusCode, 200)
+  assert.equal(bodyOf(result).data.thumbnailKey, PERSISTENT_THUMBNAIL_KEY)
+  assert.deepEqual(fixture.repository.thumbnailProcessingCalls, [])
+})
+
+test('COS 仓储使用 image_process 和桶内绝对 fileid 生成两区缩略图', async () => {
+  const requests = []
+  const repository = createCosRepository({
+    cos: {
+      request(params, callback) {
+        requests.push(params)
+        callback(null, { statusCode: 200 })
+      }
+    },
+    bucket: 'bucket-1250000000',
+    region: 'ap-guangzhou',
+    prefix: 'gift-folder',
+    downloadUrlTtlSeconds: 60
+  })
+
+  await repository.createPersistentThumbnail(IMAGE_KEY, PERSISTENT_THUMBNAIL_KEY)
+  await repository.createPersistentThumbnail(DECOR_IMAGE_KEY, DECOR_PERSISTENT_THUMBNAIL_KEY)
+
+  assert.equal(requests.length, 2)
+  for (const [index, expected] of [
+    [0, { imageKey: IMAGE_KEY, thumbnailKey: PERSISTENT_THUMBNAIL_KEY }],
+    [1, { imageKey: DECOR_IMAGE_KEY, thumbnailKey: DECOR_PERSISTENT_THUMBNAIL_KEY }]
+  ]) {
+    const params = requests[index]
+    assert.equal(params.Bucket, 'bucket-1250000000')
+    assert.equal(params.Region, 'ap-guangzhou')
+    assert.equal(params.Key, expected.imageKey)
+    assert.equal(params.Method, 'POST')
+    assert.equal(params.Action, 'image_process')
+    assert.deepEqual(JSON.parse(params.Headers['Pic-Operations']), {
+      is_pic_info: 0,
+      rules: [{
+        fileid: '/' + expected.thumbnailKey,
+        rule: PERSISTENT_THUMBNAIL_RULE
+      }]
+    })
+  }
 })
 
 test('COS 仓储将装修索引、锁和图片限定在 decor 前缀', async () => {

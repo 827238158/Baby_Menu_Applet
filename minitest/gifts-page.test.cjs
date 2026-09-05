@@ -507,6 +507,21 @@ test('旧客户端不支持图片编辑时保留拍照原图预览', () => {
   assert.equal(savedPath, 'wxfile://camera-original.jpg')
 })
 
+test('选图后只保存本地原图用于表单预览，不再本地压缩', () => {
+  const source = fs.readFileSync(PAGE_PATH, 'utf8')
+  const wxMock = createWxMock()
+  const page = loadPage({ isConfigured: () => false }, wxMock)
+  page.openCreateForm()
+
+  page.saveSelectedImage('wxfile://selected-temp.jpg')
+  wxMock.saveRequests[0].success({ savedFilePath: 'wxfile://selected-saved.jpg' })
+
+  assert.equal(page.pendingImagePath, 'wxfile://selected-saved.jpg')
+  assert.equal(page.data.form.imagePath, 'wxfile://selected-saved.jpg')
+  assert.equal(Object.hasOwn(page, 'pendingThumbnailPath'), false)
+  assert.doesNotMatch(source, /compressImage|createThumbnail|pendingThumbnailPath/)
+})
+
 test('移除预览图需要二次确认且只修改当前表单', () => {
   const wxMock = createWxMock()
   const page = loadPage({ isConfigured: () => false }, wxMock)
@@ -783,6 +798,80 @@ test('图片上传失败时保留表单且不调用礼品保存', async () => {
   assert.equal(page.data.form.imagePath, 'wxfile://selected.jpg')
   assert.equal(page.data.gifts.length, 0)
   assert.equal(wxMock.toasts.at(-1).title, '图片上传失败')
+})
+
+test('新图保存只向上传服务传入本地原图、ID 和分段', async () => {
+  const wxMock = createWxMock()
+  let uploadArguments
+  const page = loadPage({
+    isConfigured: () => true,
+    uploadImages: async (...args) => {
+      uploadArguments = args
+      return {
+        imageKey: 'gift-folder/decor/images/decor_12345678/original.jpg',
+        thumbnailKey: 'gift-folder/decor/thumbnails/decor_12345678/original.webp'
+      }
+    },
+    createDecorItem: async (item) => Object.assign({}, item, {
+      total: 1,
+      createdAt: 10,
+      updatedAt: 10
+    })
+  }, wxMock)
+  page.data.activeCollection = 'decor'
+  page.formCollection = 'decor'
+  page.data.formVisible = true
+  page.data.form = {
+    id: 'decor_12345678',
+    imagePath: 'wxfile://selected.jpg',
+    imageKey: '',
+    thumbnailKey: '',
+    name: '',
+    description: ''
+  }
+  page.pendingImagePath = 'wxfile://selected.jpg'
+
+  await page.saveGift()
+
+  assert.deepEqual(Array.from(uploadArguments), [
+    'wxfile://selected.jpg',
+    'decor_12345678',
+    'decor'
+  ])
+})
+
+test('云端保存失败后继续清理新生成的原图和缩略图', async () => {
+  const wxMock = createWxMock()
+  const cleanedKeys = []
+  const imageKey = 'gift-folder/images/gift_12345678/original.jpg'
+  const thumbnailKey = 'gift-folder/thumbnails/gift_12345678/original.webp'
+  const page = loadPage({
+    isConfigured: () => true,
+    uploadImages: async () => ({ imageKey, thumbnailKey }),
+    createGift: async () => {
+      throw new Error('保存失败')
+    },
+    deleteOrphan: async (key) => {
+      cleanedKeys.push(key)
+    }
+  }, wxMock)
+  page.data.formVisible = true
+  page.data.form = {
+    id: 'gift_12345678',
+    imagePath: 'wxfile://selected.jpg',
+    imageKey: '',
+    thumbnailKey: '',
+    name: '',
+    description: ''
+  }
+  page.pendingImagePath = 'wxfile://selected.jpg'
+
+  await page.saveGift()
+  await waitForMicrotasks()
+
+  assert.deepEqual(cleanedKeys.sort(), [imageKey, thumbnailKey].sort())
+  assert.equal(page.data.formVisible, true)
+  assert.equal(page.data.form.imagePath, 'wxfile://selected.jpg')
 })
 
 test('白名单外账号只显示受限状态，不展示本地缓存礼品', () => {

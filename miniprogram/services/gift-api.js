@@ -326,10 +326,29 @@ function createGiftApi(wxApi, config = giftCloudConfig) {
       })
     },
     uploadImage,
-    async uploadImages(originalPath, thumbnailPath, itemId, collection = 'gift') {
+    async uploadImages(originalPath, itemId, collection = 'gift') {
       const imageKey = await uploadImage(originalPath, itemId, 'image', collection)
       try {
-        const thumbnailKey = await uploadImage(thumbnailPath, itemId, 'thumbnail', collection)
+        // 原图只上传一次，缩略图由 SCF 调用数据万象持久化生成。
+        const generated = await authorizedRequest({
+          path: collection === 'decor'
+            ? '/collections/decor/uploads/thumbnail'
+            : '/uploads/thumbnail',
+          method: 'POST',
+          data: Object.assign(
+            { imageKey },
+            collection === 'decor' ? { itemId } : { giftId: itemId }
+          )
+        })
+        const thumbnailKey = generated && typeof generated.thumbnailKey === 'string'
+          ? generated.thumbnailKey.trim()
+          : ''
+        if (!thumbnailKey) {
+          throw createApiError(
+            'THUMBNAIL_PROCESSING_INVALID_RESPONSE',
+            '缩略图生成结果无效'
+          )
+        }
         return { imageKey, thumbnailKey }
       } catch (error) {
         // 等待孤儿原图清理结束，避免页面退出时后台请求被直接中断。

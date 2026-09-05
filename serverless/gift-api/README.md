@@ -15,14 +15,16 @@
 ```text
 gift-folder/gifts/{giftId}.json
 gift-folder/images/{giftId}/{timestamp}_{random}.{ext}
-gift-folder/thumbnails/{giftId}/{timestamp}_{random}.{ext}
+gift-folder/thumbnails/{giftId}/{timestamp}_{random}.webp
 gift-folder/index.json
 gift-folder/system/index.lock
 gift-folder/decor/images/{decorId}/{timestamp}_{random}.{ext}
-gift-folder/decor/thumbnails/{decorId}/{timestamp}_{random}.{ext}
+gift-folder/decor/thumbnails/{decorId}/{timestamp}_{random}.webp
 gift-folder/decor/index.json
 gift-folder/decor/system/index.lock
 ```
+
+新版小程序只把原图上传到 `images/`；SCF 随后调用数据万象 `image_process`，以 `imageMogr2/auto-orient/thumbnail/800x800>/strip/format/webp/quality/75` 持久化生成同名 WebP 缩略图。历史缩略图保持原样，不批量回填；旧客户端通过 `form-policy` 请求 `asset: thumbnail` 的双上传流程继续兼容。
 
 `gifts/*.json` 是 v1 回滚备份：已有 `index.json` 时以它的礼品集合为准；只有索引不存在时才扫描旧 JSON 重建。升级后日常增删改只写 `index.json`，不再双写礼品 JSON。
 
@@ -43,9 +45,18 @@ DELETE /collections/decor/uploads/orphan
 POST   /collections/items/{id}/move
 ```
 
+持久化缩略图接口：
+
+```text
+POST   /uploads/thumbnail
+POST   /collections/decor/uploads/thumbnail
+```
+
+礼品接口请求体为 `{ "giftId": "...", "imageKey": "..." }`，装修接口请求体为 `{ "itemId": "...", "imageKey": "..." }`，成功统一返回 `{ "thumbnailKey": "..." }`。服务端只接受对应收藏项 ID 下 `images/` 命名空间的原图 Key，缩略图 Key 由原图文件名确定性派生；重复请求发现有效 WebP 已存在时直接复用。数据万象处理失败会返回 `503 THUMBNAIL_PROCESSING_UNAVAILABLE`，新版小程序必须等待孤儿原图清理结束后再提示失败并阻止保存，不能把原图降级为列表缩略图。
+
 新建装修好物的 ID 必须以 `decor_` 开头。移动接口请求体为 `{ "targetCollection": "gift" | "decor" }`，在固定顺序取得两区写锁后先写目标索引、再移除来源；同一请求可安全重试。移动会保留收藏项 ID 和图片 Key，因此移动后的收藏项可以继续引用原命名空间中属于自身 ID 的图片，但仍禁止引用其他收藏项的图片。
 
-上传策略请求使用 `giftId`/`itemId`、`contentType`、`size`、`asset`。新图片仍写入当前分段的图片目录；编辑已经移动过的收藏项时，服务端接受根目录或 `decor/` 目录中归属同一收藏项 ID 的图片。
+上传策略请求使用 `giftId`/`itemId`、`contentType`、`size`、`asset`。新版小程序只请求 `asset: image` 并上传原图；`asset: thumbnail` 只为旧客户端兼容保留。新图片仍写入当前分段的图片目录；编辑已经移动过的收藏项时，服务端接受根目录或 `decor/` 目录中归属同一收藏项 ID 的图片。
 
 ## 2. 创建 SCF 运行角色
 
@@ -61,6 +72,8 @@ DeleteObject
 ```
 
 在 CAM 策略中对应为 `cos:GetBucket`、`cos:GetObject`、`cos:HeadObject`、`cos:PutObject`、`cos:PostObject`、`cos:DeleteObject`。资源范围选择目标存储桶及其 `gift-folder/*` 对象。`GetBucket` 用于列出旧礼品和图片前缀，其资源范围需要包含存储桶本身；`HeadObject` 用于保存前校验图片；`PostObject` 供小程序使用 SCF 临时角色凭据签名的表单直传。不要直接使用账号级永久 SecretId/SecretKey。
+
+持久化缩略图上线前，还要在数据万象控制台确认目标 COS 存储桶已绑定数据万象。SCF 通过现有临时角色凭据读取原图、写入并校验 WebP；若绑定关系或 `GetObject`、`HeadObject`、`PutObject` 权限缺失，缩略图接口会失败。删除处理失败的残留对象和前端清理孤儿原图还需要 `DeleteObject`。
 
 SCF 绑定运行角色后，会自动注入：
 
@@ -149,8 +162,10 @@ miniprogram/config/gift-cloud.js
 1. `GET /health` 正常响应。
 2. 礼品列表和缩略图正常加载。
 3. 点击礼品图片进入全屏预览，`GET /gifts/{id}/image` 能返回并展示对应原图。
-4. 新增、编辑、删除及 POST Object 图片直传正常。
-5. 超过 20 条时触底续载，验证键集分页没有重复或跳项。
+4. 礼品和装修好物分别上传一张新图，确认只直传原图，随后两个缩略图接口都能返回对应 `.webp` Key。
+5. 检查持久化对象为 WebP、最长边不超过 800px、方向正确且不含 EXIF；数据万象控制台“基础图片处理”应出现对应使用量。
+6. 新增、编辑、删除及 POST Object 图片直传正常。
+7. 超过 20 条时触底续载，验证键集分页没有重复或跳项。
 
 当前原图接口已于 2026-07-29 上传并部署，真机功能验证正常。
 
@@ -185,7 +200,7 @@ miniprogram/config/gift-cloud.js
 - 在费用中心设置预算告警，并为 SCF、COS 请求量和外网下行流量设置监控告警。
 - 更新函数代码前先运行 `npm test` 和 `npm run check`。
 - 礼品列表使用根目录 `index.json` v2 键集分页，装修好物使用 `decor/index.json` v2 键集分页，每页最多 20 件。普通写入分别使用自己的锁；跨分类移动固定按礼品锁、装修锁顺序同时加锁。
-- 新图片同时保存原图与压缩缩略图：列表只使用缩略图，全屏查看时才签发原图临时 URL。旧图片会回退使用原图，编辑并重新选择图片后会自动升级。
+- 新版小程序只上传原图，SCF 通过数据万象持久化生成最长边 800px、质量 75、自动回正且移除 EXIF 的 WebP 缩略图；列表只使用缩略图，全屏查看时才签发原图临时 URL。旧图片和旧缩略图不批量回填，重新选择图片后才使用新链路。
 - 所有 JSON 请求体最多 8KB。`/auth/login` 按 `x-scf-remote-addr` 做每暖实例滑动窗口限流；冷启动或切换实例会重置，不是跨实例全局限流。
 
 ## 9. 每日孤儿图片清理 Timer
@@ -202,12 +217,14 @@ miniprogram/config/gift-cloud.js
 
 ## 10. 兼容上线顺序
 
-1. 备份生产 `index.json` 和旧 `gifts/` 前缀。
-2. 核验 COS 版本控制，已开启则暂停。
-3. 增加 `cos:PostObject` 权限，设定不超过 7 天的 `LEGACY_PUT_UPLOAD_UNTIL`，部署兼容版 SCF。
-4. 将 COS 域名加入微信 `uploadFile` 合法域名，再发布新版小程序。
-5. 两名用户均确认更新且拍照/相册上传正常后，清空兼容时间并部署最终 SCF；核对日志不再有旧 PUT 调用。
-6. 创建每日 Timer 并执行一次受控测试。
-7. 最终重新打包，核对 ZIP 时间、`cos-nodejs-sdk-v5@3.0.0` 和关键路由后再上传。
+1. 备份生产两份 `index.json` 和礼品、装修好物的 `images/`、`thumbnails/` 前缀。
+2. 核验 COS 版本控制保持暂停，确认目标桶已绑定数据万象；复核 SCF 角色具备 `GetBucket`、`GetObject`、`HeadObject`、`PutObject`、`PostObject`、`DeleteObject`，以及 SCF/COS 对应的微信 `request`、`uploadFile`、`downloadFile` 合法域名。
+3. 先部署同时支持新缩略图接口和旧客户端 `asset: thumbnail` 的兼容版 SCF；不要先发布新版小程序。
+4. 用一次性测试图片分别调用礼品和装修好物链路，检查 WebP 格式、最长边、方向、EXIF、对象 Key，以及数据万象“基础图片处理”用量；再确认失败时不写收藏项并清理原图。
+5. 后端验证通过后再发布只上传原图的新版小程序；两名用户分别真机验证相册、拍照编辑、新增、换图、列表缩略图和全屏原图。
+6. 观察 SCF 错误日志、COS 对象、基础图片处理用量与外网流量；确认每日 Timer 仍保护两份索引引用的原图和缩略图。
+7. 若新版异常，先回退小程序到旧双上传版本，保持兼容版 SCF 在线；旧客户端恢复后再决定是否回退后端。
+
+`POST /uploads/presign` 的短期 PUT 兼容窗口仍按 `LEGACY_PUT_UPLOAD_UNTIL` 管理，与本次保留的 `asset: thumbnail` POST Object 兼容能力是两件事，不要混淆。
 
 腾讯云官方参考：[PUT Object 禁止覆盖与版本控制](https://cloud.tencent.com/document/product/436/71307)、[POST Object 策略签名](https://cloud.tencent.com/document/product/436/54370)、[SCF Timer 触发器事件](https://cloud.tencent.com/document/product/583/9708)。
