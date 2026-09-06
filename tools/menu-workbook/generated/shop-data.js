@@ -3,8 +3,8 @@ export default {
   "name": "宝宝小厨房",
   "subtitle": "小画家宝宝专用菜单",
   "shareTitle": "漂亮宝宝吃饭饭",
-  "shareImage": "../../assets/share.jpg",
-  "pageBackgroundImage": "../../assets/backgrounds/page-bg.jpg",
-  "headerBackgroundImage": "../../assets/backgrounds/header-bg.jpg",
+  "shareImage": "../assets/share.jpg",
+  "pageBackgroundImage": "../assets/backgrounds/page-bg.jpg",
+  "headerBackgroundImage": "../assets/backgrounds/header-bg.jpg",
   "headerBackgroundPosition": "center 60%"
 }

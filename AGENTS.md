@@ -1,6 +1,6 @@
 # Agent 开发指南
 
-本项目是微信原生小程序菜单展示页，定位是“可发布展示版 / 可预览展示版”，不是完整点单系统。
+本项目是微信原生小程序家庭菜单展示页：公开读取云端菜单，两名白名单用户管理共享草稿并发布，心愿夹保持私有。不是完整点单系统。
 
 ## 沟通规则
 
@@ -33,7 +33,7 @@ memory/CURRENT.md
 
 ## 项目边界
 
-- 不接实现登录、支付或真实订单功能。
+- 仅菜单管理和心愿夹复用微信白名单会话，不新增面向公众的登录功能、支付或真实订单。
 - 购物车、数量和合计都是本地前端状态。
 - 用户最终操作是复制已选菜单文本。
 - 除非用户明确要求，不要新增真实下单、云开发、后端接口、支付流程或 npm 构建流程。
@@ -44,7 +44,7 @@ memory/CURRENT.md
 
 - 微信原生小程序：WXML、WXSS、JavaScript、JSON。
 - 主入口页面：`miniprogram/pages/menu/menu`。
-- 页面数据入口：`miniprogram/data/menu-data.js`。
+- 线上菜单请求入口：`miniprogram/services/menu-api.js`；旧迁移资料位于 `tools/menu-workbook/`，不进入小程序代码包。
 - 使用微信开发者工具导入仓库根目录预览。
 
 ## 关键文件
@@ -53,13 +53,17 @@ memory/CURRENT.md
 tools/menu-workbook/menu-data.xlsx
 tools/generate-menu-data.js
 tools/generate-menu-data.py
-miniprogram/data/shop-data.js
-miniprogram/data/category-data.js
-miniprogram/data/dish-data.js
-miniprogram/data/menu-data.js
+tools/menu-workbook/generated/
+tools/menu-workbook/assets/
 miniprogram/pages/menu/menu.js
 miniprogram/pages/menu/menu.wxml
 miniprogram/pages/menu/menu.wxss
+miniprogram/pages/menu-admin/
+miniprogram/pages/menu-preview/
+miniprogram/services/menu-api.js
+serverless/gift-api/src/menu/
+tools/menu-cloud/
+docs/menu-cloud-deployment.md
 miniprogram/assets/
 CUSTOMIZATION.md
 README.md
@@ -69,14 +73,13 @@ memory/
 
 ## 菜单数据维护
 
-- 日常不需要手改 `tools/menu-workbook/menu-data.xlsx`，不要手改生成后的 `miniprogram/data/*.js`，除非用户明确需求。
-- 工作簿当前只保留 `Shop`、`Categories`、`Dishes` 三类 Sheet。
-- 商品图片放在 `miniprogram/assets/foods/`。
-- `Dishes.imageFile` 只填文件名，例如 `mango.jpg`；留空会使用占位图。
-- 不要把 Windows 绝对路径写进图片配置。
-- 修改 Excel 后按 `memory/RUNBOOK.md` 的“菜单数据生成”步骤执行并检查结果。
-- `generate-menu-data.js` 是日常入口，负责寻找可用 Python；`generate-menu-data.py` 负责读取 Excel 并生成数据文件。
-- `menu-data.js` 只做聚合和排序，通常不要改。
+- 日常使用小程序菜单管理，云端为唯一真源；保存共享草稿后预览发布，历史恢复先替换草稿再发布。
+- 菜单后端独立放在 `serverless/gift-api/src/menu/`；保持原部署入口，COS 使用独立 `menu/` 前缀，不能混入心愿夹索引或清理。
+- 全部发布快照及其图片保留，菜单锁不自动抢占；部署与恢复先读 `docs/menu-cloud-deployment.md`。
+- `tools/menu-workbook/` 下的 Excel、生成 JS 和图片是旧迁移源；除非明确修复迁移资料，不手改或重新生成。
+- 旧工作簿包含 Shop、Categories、Dishes。旧 imageFile 只填文件名，不能填 Windows 绝对路径。
+- 修复旧源时按 RUNBOOK“旧菜单数据生成”执行；首次上云使用 `tools/menu-cloud/`，禁止覆盖非空菜单命名空间。
+- 旧 generate-menu-data.js 寻找 Python，generate-menu-data.py 读取 Excel，menu-data.js 聚合排序；这些脚本不会更新云端。
 
 ## 记忆更新规则
 

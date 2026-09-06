@@ -1,130 +1,45 @@
-# 微信小程序展示点餐页
+# 宝宝菜单小程序
 
-这是一个微信原生小程序项目，用于展示一份可分享的家庭私房菜单。菜单仍是本地展示功能，不包含支付或真实下单；心愿夹可选接入 SCF + 私有 COS，供两名授权用户共享礼品和装修好物。
+微信原生家庭菜单：公开浏览云端菜单，本地选择规格、加入购物车并复制已选清单。没有支付、真实订单或数据库，菜品价格统一为字符串 `'0'`。
 
-## 当前状态
+菜单管理仅允许与心愿夹相同的两名 OpenID 白名单用户访问。两人维护共享草稿，预览后手动发布；全部发布 JSON 和引用图片保留，可恢复到草稿再发布。心愿夹中的礼品与装修好物继续保持私有。
 
-- 入口页面：`miniprogram/pages/menu/menu`
-- 聚合入口：`miniprogram/data/menu-data.js`
-- 店铺配置：`miniprogram/data/shop-data.js`
-- 分类配置：`miniprogram/data/category-data.js`
-- 餐品配置：`miniprogram/data/dish-data.js`
-- 项目配置：`project.config.json`
-- 小程序 AppID：已在 `project.config.json` 配置
-- 图片资源：仓库已内置分享图、菜品图、背景图和通用占位图
-- 心愿夹后端：`serverless/gift-api`
-- 礼品夹云端状态：本地已完成“只上传原图、SCF 调用数据万象持久化生成 WebP 缩略图”迁移并生成新版部署包；新版 SCF 尚未生产部署或真机验收
+## 当前上线状态
 
-## 目录结构
+菜单上云代码与一次性迁移工具在本地实现。腾讯云新版 SCF、数据万象缩略图、菜单初始化和新版小程序尚待部署及真机验收，不代表线上已经启用。准确验证结果和待办见 [当前状态](memory/CURRENT.md)。
+
+使用微信开发者工具导入仓库根目录和现有 AppID。新菜单页需要新版后端与首个已发布菜单；没有云端内容和缓存时显示错误/重试提示，不再加载随包旧菜品。
+
+## 目录职责
 
 ```text
-.
-├── README.md
-├── CUSTOMIZATION.md
-├── project.config.json
-├── serverless
-│   └── gift-api
-└── miniprogram
-    ├── app.js
-    ├── app.json
-    ├── app.wxss
-    ├── sitemap.json
-    ├── data
-    │   ├── shop-data.js
-    │   ├── category-data.js
-    │   ├── dish-data.js
-    │   └── menu-data.js
-    ├── config
-    │   └── gift-cloud.js
-    ├── services
-    │   └── gift-api.js
-    ├── pages
-    │   ├── gifts
-    │   └── menu
-    │       ├── menu.js
-    │       ├── menu.json
-    │       ├── menu.wxml
-    │       └── menu.wxss
-    └── assets
-        ├── README.md
-        ├── placeholder-food.jpg
-        ├── share.jpg
-        ├── backgrounds
-        │   ├── page-bg.jpg
-        │   └── header-bg.jpg
-        └── foods
-            ├── beef-rice.jpg
-            ├── tomato-noodle.jpg
-            ├── chicken-soup.jpg
-            └── lemon-tea.jpg
+miniprogram/
+  pages/menu/                 公开菜单入口与共享 WXML/WXSS
+  pages/menu-admin/           菜品、分类、页面设置、历史管理
+  pages/menu-preview/         草稿预览与发布
+  pages/gifts/                私有心愿夹
+  services/                  公共会话、菜单交互、请求与图片服务
+  components/                可复用组件
+  config/gift-cloud.js        菜单与心愿夹共用的 SCF 地址
+  assets/                    小程序运行时通用兜底资源
+serverless/gift-api/
+  index.js                   保持原部署入口
+  src/menu/                  独立菜单校验、仓储与业务
+  src/                       心愿夹及共享 COS、微信鉴权能力
+  test/                      后端测试
+tools/menu-cloud/            一次性迁移和只读检查
+tools/menu-workbook/         旧 Excel、生成数据及图片迁移源（不进代码包）
+minitest/                   小程序逻辑及结构测试
+docs/menu-cloud-deployment.md 腾讯云操作与恢复手册
+memory/                     状态、稳定事实、陷阱和运行命令
 ```
 
-## 如何继续改菜单
+## 日常使用与开发
 
-现在主要编辑 Excel 源数据文件：
+- 菜单页长按店名标题（白名单用户） → 编辑 → 保存共享草稿 → 预览 → 发布。详见 [维护指南](CUSTOMIZATION.md)。
+- 公开菜单首次进入和返回页面时自动检查版本；网络失败使用最近成功缓存。预览购物车与真实购物车隔离。
+- 首次迁移使用 [迁移工具](tools/menu-cloud/README.md)，之后云端为唯一真源，不再通过 Excel 生成脚本更新线上菜单。
+- UI 规则只维护在 [DESIGN.md](DESIGN.md)，命令和验收统一维护在 [RUNBOOK](memory/RUNBOOK.md)。
+- 腾讯云操作按 [菜单部署手册](docs/menu-cloud-deployment.md)；心愿夹兼容要求见 [后端说明](serverless/gift-api/README.md)。Git push 不会部署 SCF 或发布小程序。
 
-- `tools/menu-workbook/menu-data.xlsx`：店铺、分类、商品、标签和规格的日常维护入口
-
-修改后运行：
-
-```powershell
-node tools\generate-menu-data.js
-```
-
-脚本会生成：
-
-- `miniprogram/data/shop-data.js`
-- `miniprogram/data/category-data.js`
-- `miniprogram/data/dish-data.js`
-
-`miniprogram/data/menu-data.js` 是自动聚合入口，一般不需要手动修改。
-
-更完整的自定义替换说明见 `CUSTOMIZATION.md`。
-
-## 如何用微信开发者工具预览
-
-1. 打开微信开发者工具。
-2. 选择“导入项目”。
-3. 项目目录选择仓库根目录，也就是包含 `project.config.json` 的目录。
-4. 使用 `project.config.json` 中已经配置的小程序 AppID。
-5. 编译后会进入 `pages/menu/menu`。
-
-## 配置共享心愿夹
-
-心愿夹云端功能需要先部署 SCF 和私有 COS，礼品夹与装修好物共用同一函数、存储桶和白名单，但使用独立索引和图片命名空间。完整步骤见：
-
-```text
-serverless/gift-api/README.md
-```
-
-部署完成后，把 SCF 函数 URL 填入 `miniprogram/config/gift-cloud.js`。该 URL 不是密钥；OpenID、AppSecret、会话密钥和腾讯云临时凭证都只存在于 SCF 环境中。
-
-新版图片链路只由小程序直传原图，SCF 再通过数据万象生成最长边 800px、质量 75、自动回正并移除 EXIF 的 WebP 缩略图；历史图片不批量回填，旧客户端的缩略图直传暂时兼容。发布时必须先部署并验证兼容版 SCF，再发布新版小程序。
-
-## 测试清单
-
-- 分类按 `category-data.js` 的 `order` 排序。
-- 餐品按 `dish-data.js` 的 `categoryId` 和 `order` 归类展示。
-- 分类切换正常，左侧分类数量显示正确。
-- 点击餐品图片或文字区可以打开详情弹层，点击遮罩可以关闭。
-- 有规格餐品点击圆形 `+` 会先打开规格选择，未选必选项不能加入。
-- 无规格餐品点击圆形 `+` 会直接加入。
-- 同一餐品不同规格组合会分开显示和计数。
-- 底部已选数量、菜品摘要和模拟合计正确。
-- 右上角转发和分享到朋友圈使用预设的标题、页面路径和分享图；页面不额外放显式分享按钮。
-- 替换或故意写错菜品图片路径时，页面会显示通用占位图，不影响布局。
-- 心愿夹默认显示礼品夹，点按分段可切换到装修好物；两区分别维护列表、分页和缓存。
-- 心愿夹头图和分段控件常驻屏幕，礼品列表独立滚动并分别记住两区位置；编辑收藏项时可以整体移动到另一分段。
-- 心愿夹先完成白名单授权并显示加载骨架；授权成功后再读取云端列表，本地缓存只用于授权后的展示地址复用和网络失败兜底。
-- 未授权微信账号不能查询、新增、编辑或删除任一分段内容。
-- 仅文字、仅图片和图片加文字礼品均可保存。
-- 新选图片只上传一份原图，礼品与装修好物列表加载持久化 WebP 缩略图，点击图片进入全屏预览后可以正常加载原图。
-- 礼品列表超过 20 条时触底续载不重复、不跳项，两人并发增删改后总数一致。
-
-## 技术说明
-
-- 只使用微信原生 WXML、WXSS、JS、JSON。
-- 小程序本身不需要 npm、webpack、Taro、uni-app 或其他编译依赖。
-- `serverless/gift-api` 是独立 Node.js 18 项目，仅在打包 SCF 时安装依赖。
-- 菜单数据生成脚本需要本地 Node.js 调用 Python，并由 Python `openpyxl` 读取 Excel。
-- 菜单和购物车仍是本地状态；心愿夹以私有 COS 为云端数据源。
+长期边界：不替换 AppID，不新增真实下单或支付，不在小程序、源码、文档或仓库文件中保存永久云密钥。

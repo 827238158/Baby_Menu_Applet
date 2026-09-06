@@ -13,9 +13,10 @@ except ImportError:
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 WORKBOOK_PATH = ROOT_DIR / 'tools' / 'menu-workbook' / 'menu-data.xlsx'
-DATA_DIR = ROOT_DIR / 'miniprogram' / 'data'
-PLACEHOLDER_IMAGE = '../../assets/placeholder-food.jpg'
-FOOD_IMAGE_PREFIX = '../../assets/foods/'
+# 旧迁移资料不进入小程序代码包，仅供历史核对和一次性迁移工具使用。
+DATA_DIR = ROOT_DIR / 'tools' / 'menu-workbook' / 'generated'
+PLACEHOLDER_IMAGE = '../assets/placeholder-food.jpg'
+FOOD_IMAGE_PREFIX = '../assets/foods/'
 
 TAG_SPLIT_RE = re.compile(r'[、,，;；\n]+')
 CHOICE_SPLIT_RE = re.compile(r'[、,，;；|]+')
@@ -55,6 +56,18 @@ def image_path(image_file, dish=None):
         raise MenuDataError(f'Dishes{row_label} imageFile 只允许填写文件名，不能包含路径：{value}')
 
     return FOOD_IMAGE_PREFIX + value
+
+
+def shop_image_path(value, field_name):
+    """将旧工作簿中的小程序相对路径转换为迁移资料目录的相对路径。"""
+    value = normalize_text(value)
+    if not value:
+        return ''
+    if value.startswith('../assets/'):
+        return value
+    if value.startswith('../../assets/'):
+        return '../assets/' + value[len('../../assets/'):]
+    raise MenuDataError(f'Shop {field_name} 只允许使用旧 assets 相对路径：{value}')
 
 
 def js_file(name, value):
@@ -204,9 +217,9 @@ def build_shop(workbook):
         'name': shop['name'],
         'subtitle': shop['subtitle'],
         'shareTitle': shop['shareTitle'],
-        'shareImage': shop['shareImage'],
-        'pageBackgroundImage': shop['pageBackgroundImage'],
-        'headerBackgroundImage': shop['headerBackgroundImage'],
+        'shareImage': shop_image_path(shop['shareImage'], 'shareImage'),
+        'pageBackgroundImage': shop_image_path(shop['pageBackgroundImage'], 'pageBackgroundImage'),
+        'headerBackgroundImage': shop_image_path(shop['headerBackgroundImage'], 'headerBackgroundImage'),
         'headerBackgroundPosition': shop['headerBackgroundPosition'],
     }
 
@@ -286,9 +299,9 @@ def main():
 
     print('Generated menu data from Excel workbook:')
     print('- tools/menu-workbook/menu-data.xlsx')
-    print('- miniprogram/data/shop-data.js')
-    print('- miniprogram/data/category-data.js')
-    print('- miniprogram/data/dish-data.js')
+    print('- tools/menu-workbook/generated/shop-data.js')
+    print('- tools/menu-workbook/generated/category-data.js')
+    print('- tools/menu-workbook/generated/dish-data.js')
 
 
 if __name__ == '__main__':

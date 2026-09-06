@@ -1,22 +1,22 @@
 # 运行手册
 
-## 菜单数据生成
+## 旧菜单数据生成
 
-修改 Excel 后，在项目根目录运行：
+仅用于修复旧迁移源，不更新线上菜单。修改 Excel 后，在项目根目录运行：
 
 ```powershell
 node tools\generate-menu-data.js
 ```
 
-该命令会生成：
+该命令会生成仅供迁移核对的资料：
 
 ```text
-miniprogram/data/shop-data.js
-miniprogram/data/category-data.js
-miniprogram/data/dish-data.js
+tools/menu-workbook/generated/shop-data.js
+tools/menu-workbook/generated/category-data.js
+tools/menu-workbook/generated/dish-data.js
 ```
 
-`miniprogram/data/menu-data.js` 只做聚合和排序，通常不要手改。
+生成资料不会进入小程序代码包，也不会同步到云端。
 
 ## 语法检查
 
@@ -25,16 +25,15 @@ node --check miniprogram\pages\menu\menu.js
 node --check miniprogram\pages\gifts\gifts.js
 node --check miniprogram\services\gift-api.js
 node --check miniprogram\config\gift-cloud.js
-node --check miniprogram\data\shop-data.js
-node --check miniprogram\data\category-data.js
-node --check miniprogram\data\dish-data.js
-node --check miniprogram\data\menu-data.js
+node --check tools\menu-workbook\generated\shop-data.js
+node --check tools\menu-workbook\generated\category-data.js
+node --check tools\menu-workbook\generated\dish-data.js
 ```
 
 ## 数据聚合检查
 
 ```powershell
-node --input-type=module -e "import('./miniprogram/data/menu-data.js').then(({default:data})=>{const dishes=data.categories.flatMap(c=>c.items); console.log(data.categories.length,dishes.length,dishes.reduce((n,d)=>n+(d.tags||[]).length,0),dishes.reduce((n,d)=>n+(d.options||[]).length,0));})"
+node --input-type=module -e "Promise.all(['shop','category','dish'].map((name)=>import('./tools/menu-workbook/generated/'+name+'-data.js'))).then(([shop,categories,dishes])=>console.log(shop.default.name,categories.default.length,dishes.default.length))"
 ```
 
 ## 空白检查
@@ -43,10 +42,10 @@ node --input-type=module -e "import('./miniprogram/data/menu-data.js').then(({de
 git diff --check
 ```
 
-## 心愿夹云端测试
+## 全量本地测试
 
 ```powershell
-node --test --test-isolation=none minitest\gift-api.test.cjs minitest\gifts-page.test.cjs minitest\menu-page.test.cjs
+node --test --test-isolation=none minitest/*.test.cjs tools/menu-cloud/migration.test.cjs
 Set-Location serverless\gift-api
 npm test
 npm run check
@@ -59,15 +58,43 @@ npm audit --omit=dev
 Set-Location serverless\gift-api
 npm test
 npm run check
-npm ci --omit=dev
+npm ls --omit=dev
 tar.exe -a -c -f gift-api.zip index.js src node_modules package.json
 Get-Item gift-api.zip | Select-Object FullName,Length,LastWriteTime
 tar.exe -tf gift-api.zip | Select-String -Pattern '^(index.js|src/app.js|package.json)$'
 ```
 
+本次未改变生产依赖，使用 `npm ls --omit=dev` 核对现有安装即可，无需重装。以后 lockfile 改变时，先确认 Node 环境和依赖来源；需要下载包时按用户下载约定处理，再安装锁定依赖。
+
 只要 `index.js`、`src/`、`package.json` 或生产依赖发生变化，都要重新执行上述命令，在腾讯云 SCF 控制台上传新 ZIP 并完成部署/发布。上传前确认 ZIP 修改时间晚于后端源码修改时间；涉及新路由时，还要从 ZIP 中检查对应代码确实存在。
 
 部署参数、运行角色、环境变量、OpenID 发现模式和合法域名见 `serverless/gift-api/README.md`。
+
+## 菜单迁移与发布
+
+```powershell
+node tools/menu-cloud/migrate.cjs --check
+```
+
+上述只读检查通过后，首次云端初始化才使用 `--execute`；凭据、权限和不覆盖约束见 [工具说明](../tools/menu-cloud/README.md)，后台操作和失败恢复见 [菜单部署手册](../docs/menu-cloud-deployment.md)。不要在初始化前发布新小程序。
+
+菜单新增脚本语法检查：
+
+```powershell
+node --check miniprogram/services/cloud-client.js
+node --check miniprogram/services/menu-api.js
+node --check miniprogram/services/menu-images.js
+node --check miniprogram/services/menu-document.js
+node --check miniprogram/services/menu-cloud-page.js
+node --check miniprogram/services/menu-page.js
+node --check miniprogram/pages/menu-admin/menu-admin.js
+node --check miniprogram/pages/menu-preview/menu-preview.js
+node --check tools/menu-cloud/migrate.cjs
+```
+
+本机测试命令使用支持 `--test-isolation=none` 的 Node；SCF Node 18 执行生产入口，不运行本机测试命令。不得据本机测试推断已经完成 SCF 真机验证。
+
+部署 ZIP 应包含 `src/menu/document.js`、`repository.js`、`service.js`。部署后保留 `GiftImageCleanupDaily` 并新增 `MenuImageCleanupDaily`，不能互相替换。
 
 ## SCF 部署后验证
 
@@ -114,9 +141,12 @@ tar.exe -tf gift-api.zip | Select-String -Pattern '^(index.js|src/app.js|package
 1. 打开微信开发者工具。
 2. 导入仓库根目录，也就是包含 `project.config.json` 的目录。
 3. 使用 `project.config.json` 中已经配置的小程序 AppID。
-4. 编译后进入 `pages/menu/menu`。
+4. 编译后进入 `pages/menu/menu`；需要新版云端接口及已初始化菜单。无缓存而未部署时显示重试，不加载旧数据。
+5. 新增页面后清缓存并编译；三页静态资源/事件检查已纳入 minitest。
 
 ## 手动验收
+
+菜单上云还需完成 [部署手册的真机验收](../docs/menu-cloud-deployment.md)：匿名阅读、两人编辑、共享草稿冲突、发布/恢复、全历史图片保护、缓存与预览购物车隔离。
 
 - 分类切换正常。
 - 商品展示和图片加载正常。

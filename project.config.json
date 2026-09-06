@@ -20,7 +20,12 @@
     "libVersion": "3.16.1",
     "srcMiniprogramRoot": "miniprogram/",
     "packOptions": {
-        "ignore": [],
+        "ignore": [
+            {
+                "type": "folder",
+                "value": "assets/backgrounds"
+            }
+        ],
         "include": []
     },
     "editorSetting": {

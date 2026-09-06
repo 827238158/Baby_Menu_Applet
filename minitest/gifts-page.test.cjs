@@ -132,16 +132,11 @@ function loadPage(giftApi, wxMock) {
   let definition
   const source = fs.readFileSync(PAGE_PATH, 'utf8')
     .replace(
-      "import menuData from '../../data/menu-data.js'",
-      'const menuData = __menuData'
-    )
-    .replace(
       "const giftApi = require('../../services/gift-api.js')",
       'const giftApi = __giftApi'
     )
   const sandbox = {
     __giftApi: giftApi,
-    __menuData: { shop: {} },
     console,
     Page(config) {
       definition = config

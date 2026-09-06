@@ -1,17 +1,26 @@
 <view class="page" style="{{pageStyle}}">
+  <view wx:if="{{previewMode}}" class="preview-identity">草稿预览 · 不影响真实购物车</view>
+  <view wx:if="{{cloudLoading}}" class="cloud-notice">正在读取菜单…</view>
+  <view wx:if="{{cloudError}}" class="cloud-notice" bindtap="refreshMenu">{{cloudError}} · 点击重试</view>
+  <view wx:if="{{previewMode && hasMenu}}" class="preview-publish">
+    <text>{{previewSummary}}</text>
+    <button bindtap="publishPreview" loading="{{publishing}}" disabled="{{publishing || cloudLoading}}">发布此菜单</button>
+  </view>
+  <block wx:if="{{hasMenu}}">
   <view class="shop-header">
     <image
       wx:if="{{shop.headerBackgroundImage}}"
       class="shop-header-bg"
-      src="{{shop.headerBackgroundImage}}"
-      mode="aspectFill"
-    ></image>
+      src="{{shop.headerBackgroundImage}}" mode="scaleToFill" style="{{headerImageStyle || 'width:100%;height:100%;'}}"
+      data-asset="{{headerAssetId}}" data-src="{{shop.headerBackgroundImage}}" bindload="handleHeaderLoad" binderror="handleHeaderError"
+    />
+    <text wx:if="{{headerImageFailed}}" class="header-image-failed">头图暂不可用</text>
     <view class="shop-header-overlay"></view>
     <view class="shop-copy">
-      <text class="shop-name">{{shop.name}}</text>
+      <text class="shop-name" bindlongpress="openMenuAdmin">{{shop.name}}</text>
       <text class="shop-subtitle">{{shop.subtitle}}</text>
     </view>
-    <button class="gift-folder-entry" bindtap="openGiftFolder" aria-label="打开心愿夹">
+    <button wx:if="{{!previewMode}}" class="gift-folder-entry" bindtap="openGiftFolder" aria-label="打开心愿夹">
       <view class="gift-entry-icon" aria-hidden="true">
         <view class="gift-entry-lid"></view>
         <view class="gift-entry-box"></view>
@@ -255,4 +264,5 @@
       </view>
     </view>
   </view>
+  </block>
 </view>

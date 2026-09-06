@@ -1,6 +1,7 @@
 'use strict'
 
 const crypto = require('node:crypto')
+const { createMenuService } = require('./menu/service')
 
 const IMAGE_TYPES = new Map([
   ['image/jpeg', 'jpg'],
@@ -149,6 +150,7 @@ function createApp({
   logger = console
 }) {
   const loginAttempts = new Map()
+  const menuService = createMenuService({ repository, config, HttpError, now, randomBytes, logger })
   const isCollectionImageKeyForItem = repository.isCollectionImageKeyForItem ||
     ((key, id) => repository.isImageKeyForGift(key, id) ||
       typeof repository.isDecorImageKeyForItem === 'function' && repository.isDecorImageKeyForItem(key, id))
@@ -1270,6 +1272,9 @@ function createApp({
     const path = normalizePath(event.path)
 
     try {
+      if (!method && event.Type === 'Timer' && event.TriggerName === 'MenuImageCleanupDaily') {
+        return await menuService.cleanup()
+      }
       if (!method && event.Type === 'Timer' && event.TriggerName === config.cleanupTimerName) {
         return await cleanupOrphanImages()
       }
@@ -1280,6 +1285,16 @@ function createApp({
 
       if (method === 'POST' && path === '/auth/login') {
         return await login(event)
+      }
+
+      // 匿名菜单读取先于心愿夹鉴权；菜单模块逐次校验所有管理接口。
+      if (path === '/menu' || path.startsWith('/menu/')) {
+        const data = await menuService.route({
+          method, path, query: event.queryStringParameters || {},
+          body: parseBody(event, path === '/menu/admin/draft' ? 1024 * 1024 : config.maxJsonBodyBytes || 8 * 1024),
+          requireUser: () => requireUser(event)
+        })
+        return success(data)
       }
 
       requireUser(event)

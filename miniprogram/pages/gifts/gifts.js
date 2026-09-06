@@ -1,5 +1,3 @@
-import menuData from '../../data/menu-data.js'
-
 const giftApi = require('../../services/gift-api.js')
 const GIFT_STORAGE_KEY = 'baby_gift_folder_v1'
 const DECOR_STORAGE_KEY = 'baby_decor_folder_v1'
@@ -8,6 +6,11 @@ const CARD_MOTION_DURATION = 240
 const PREVIEW_CLOSE_DURATION = 220
 const COLLECTION_GIFT = 'gift'
 const COLLECTION_DECOR = 'decor'
+// 心愿夹不依赖旧菜单迁移数据；菜单背景由菜单页独立从云端加载。
+const DEFAULT_SHOP = {
+  headerBackgroundImage: '',
+  pageBackgroundImage: ''
+}
 const COLLECTION_CONFIG = {
   gift: {
     title: '礼品夹',
@@ -197,8 +200,8 @@ function serializeGifts(gifts) {
 
 Page({
   data: {
-    shop: menuData.shop,
-    pageStyle: getPageStyle(menuData.shop),
+    shop: DEFAULT_SHOP,
+    pageStyle: getPageStyle(DEFAULT_SHOP),
     activeCollection: COLLECTION_GIFT,
     collectionTitle: COLLECTION_CONFIG.gift.title,
     collectionSubtitleNoun: COLLECTION_CONFIG.gift.subtitleNoun,

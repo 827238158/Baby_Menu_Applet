@@ -1,36 +1,10 @@
 # 图片资源说明
 
-仓库已内置可预览占位图，导入微信开发者工具后可以直接看到完整页面。
+线上菜单图片通过手机管理页上传至私有 COS，日常不再覆盖本地文件或手改生成 JS。原图及 WebP 缩略图通过稳定资产 ID 引用，背景、头图和分享图片同样由云端维护。
 
-```text
-share.jpg
-placeholder-food.jpg
-foods/beef-rice.jpg
-foods/tomato-noodle.jpg
-foods/chicken-soup.jpg
-foods/lemon-tea.jpg
-backgrounds/page-bg.jpg
-backgrounds/header-bg.jpg
-```
+本目录仅保留小程序运行时需要的通用兜底资源。旧菜单迁移图片与生成数据已移至 `tools/menu-workbook/`，不会再进入小程序代码包。
 
-替换真实图片时，可以同名覆盖这些 JPG 文件，也可以新增图片后修改数据文件中的路径：
+- `placeholder-food.jpg`：菜单缺图/失败占位。
+- `share.jpg`：无云端分享图时的默认分享资源。
 
-- 分享图：`miniprogram/data/shop-data.js` 的 `shareImage`
-- 页面背景图：`miniprogram/data/shop-data.js` 的 `pageBackgroundImage`
-- 顶部背景图：`miniprogram/data/shop-data.js` 的 `headerBackgroundImage`
-- 餐品图片：`miniprogram/data/dish-data.js` 的 `image`
-
-代码中的图片路径是相对菜单页 `miniprogram/pages/menu/` 的写法，例如：
-
-```js
-image: '../../assets/foods/beef-rice.jpg'
-pageBackgroundImage: '../../assets/backgrounds/page-bg.jpg'
-```
-
-如果某张菜品图加载失败，页面会自动回退到：
-
-```text
-../../assets/placeholder-food.jpg
-```
-
-请保持目录名、文件名和扩展名大小写完全一致。
+迁移说明见 [tools/menu-cloud](../../tools/menu-cloud/README.md)。以后换图使用新资产 ID，原图可能仍被历史引用，不能按当前菜单未使用就删除 COS 图片。

@@ -14,19 +14,19 @@
 
 ## 菜单数据与图片
 
-- Trigger: 想直接编辑 `miniprogram/data/*.js`。
+- Trigger: 想直接编辑 `tools/menu-workbook/generated/*.js`。
   Cause: 这些文件由 Excel 和生成脚本产出，手改容易被覆盖。
-  Recovery: 优先修改 `tools/menu-workbook/menu-data.xlsx`，再运行 `node tools\generate-menu-data.js`；除非用户明确要求，才手改生成后的数据文件。
+  Recovery: 上云后从菜单管理页维护。仅明确修复旧迁移源时才修改 Excel 并运行生成脚本；它不会同步云端。
 
 - Trigger: 商品图片路径在小程序里加载失败。
   Cause: `Dishes.imageFile` 写入了 Windows 绝对路径或错误路径。
-  Recovery: 商品图片放到 `miniprogram/assets/foods/`，`imageFile` 只填文件名；留空则使用占位图。
+  Recovery: 商品图片放到 `tools/menu-workbook/assets/foods/`，`imageFile` 只填文件名；留空则使用迁移占位标记。
 
 ## 产品与发布边界
 
 - Trigger: 想把展示页扩展成真实下单系统。
-  Cause: 项目边界是本地展示版，不包含后端、数据库、登录、支付或真实订单。
-  Recovery: 除非用户明确要求，不新增真实下单、云开发、后端接口、支付流程或 npm 构建流程。
+  Cause: 项目为菜单展示，现有后端只服务菜单内容和私有心愿夹，不包含真实订单或支付。
+  Recovery: 保留已授权的 SCF/COS 和管理白名单，除非明确要求，不新增真实订单、支付、数据库或 npm 构建流程。
 
 - Trigger: 准备发布或替换 AppID。
   Cause: 当前 `project.config.json` 已配置正式 AppID，随意替换会导致微信登录身份空间变化。
@@ -85,3 +85,30 @@
 - Trigger: 绝对定位的圆形叉号、图标或小按钮在开发者工具正常，真机或其他客户端却被拉成椭圆。
   Cause: 使用原生 `<button>` 承载纯图标；微信宿主的按钮默认最小尺寸、行高和伪元素在不同客户端可能与页面样式叠加，仅设置 `width` / `height` 不足以稳定保证正方形。
   Recovery: 纯图标覆盖层优先使用带 `aria-role="button"` 和 `aria-label` 的 `<view>`，同时锁定 `width` / `min-width` / `max-width` 与对应高度，再用 flex 居中；必须使用 `<button>` 时，要完整重置最小尺寸、padding、line-height 和 `::after`，并做真机验证。
+## 云端菜单
+
+- Trigger: 临时迁移凭据可读取桶版本控制，但用 `Prefix: 'menu/'` 列举对象仍返回 403 `AccessDenied`。
+  Cause: CAM 策略的 `cos:prefix` 条件值包含 `/` 时需要 URL 编码；直接写 `menu/` 或 `menu/*` 不能匹配 COS 实际用于鉴权的前缀值。
+  Recovery: 对精确菜单前缀使用 `"string_equal": { "cos:prefix": "menu%2F" }`，重新取得临时凭据后先执行只读 `GetBucket` 测试，确认返回 200 且空前缀再运行初始化。
+
+- Trigger: 菜单写入持续返回 MENU_BUSY。
+  Cause: 菜单锁不自动抢占，进程中断可能遗留 menu/system/write.lock。
+  Recovery: 按 docs/menu-cloud-deployment.md 确认所有 SCF 和本机迁移已结束、保存锁内容并核验数据后，才人工删除精确锁对象；不可按时间自动解锁。
+
+- Trigger: 当前菜单未用的图片仍占空间。
+  Cause: 全部历史及失败发布快照都保护引用图片，以确保恢复可用。
+  Recovery: 不按当前菜单单独删除；只由 MenuImageCleanupDaily 合并草稿和所有快照引用后清理孤儿图。
+
+- Trigger: 初始化失败后重跑返回 MENU_NOT_EMPTY。
+  Cause: 上传或首发失败可能留下部分对象，工具拒绝覆盖任何已有菜单。
+  Recovery: 先检查 current 与草稿；已有草稿可从管理页预览发布，只有部分上传时按部署手册核验后处理，不删除心愿夹或整个桶。
+
+## 头图加载
+
+- Trigger: 首页头图间歇灰底，返回页面时闪回灰色。
+  Cause: 原实现使用无法监听加载错误的 CSS 背景；下载兜底等待菜品图片队列，返回时还会先把成功的临时地址换回网络地址。这些代码缺陷已确认，具体客户端故障仍需日志和真机复现。
+  Recovery: 头图使用带加载事件的图片层，店铺图片独立加载，临时文件存在时复用，失败刷新签名并有界重试；不能用旧菜单请求覆盖新头图。取景计算统一在 services/menu-header.js。
+
+- Trigger: 管理页长按头图拖动取景时，页面仍跟着上下滚动。
+  Cause: 只设置 page-meta 的 overflow:hidden，头图却使用 bindtouchmove，移动事件仍向外传递，未在触摸层阻止页面滚动。
+  Recovery: 用 headerDragging 动态启用 catchtouchmove；未拖动时绑定为空，保留普通页面滑动。松手、取消、隐藏页面时解除拖动状态。真机验证同一次长按手势中的拖动及松手后滚动恢复。

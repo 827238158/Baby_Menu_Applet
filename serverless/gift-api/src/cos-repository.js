@@ -1,6 +1,7 @@
 'use strict'
 
 const crypto = require('node:crypto')
+const { createMenuRepository } = require('./menu/repository')
 
 const PERSISTENT_THUMBNAIL_RULE = 'imageMogr2/auto-orient/thumbnail/800x800>/strip/format/webp/quality/75'
 
@@ -83,7 +84,10 @@ function createCosRepository({
       }
 
       const truncated = result.IsTruncated === true || result.IsTruncated === 'true'
-      marker = truncated ? String(result.NextMarker || '') : ''
+      const nextMarker = truncated ? String(result.NextMarker || '') : ''
+      // 扫描不完整时必须失败，尤其不能让清理任务据此误删仍被引用的图片。
+      if (truncated && (!nextMarker || nextMarker === marker)) throw new Error('COS 列表分页游标缺失或没有前进')
+      marker = nextMarker
     } while (marker)
 
     return objects
@@ -385,6 +389,7 @@ function createCosRepository({
   }
 
   return {
+    menu: createMenuRepository({ readJsonOrNull, putJson, listObjects, deleteObject, isAlreadyExists }),
     createPersistentThumbnail,
     deleteImage,
     getDownloadUrl,

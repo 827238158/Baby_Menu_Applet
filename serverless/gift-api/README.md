@@ -1,6 +1,8 @@
-# 心愿夹 SCF 部署手册
+# 菜单与心愿夹 SCF 部署手册
 
-本目录是独立的 Node.js 18 SCF 事件函数。礼品和装修好物的元数据、图片都保存在同一个私有 COS，不使用数据库；两者复用同一套白名单和会话鉴权，但使用互相隔离的索引、图片前缀和写锁。`gift-folder/index.json` schema v2 仍是礼品元数据的唯一真源，旧版路由和对象 Key 不变。
+本目录是共用的 Node.js 18 SCF 事件函数，现有名称和入口保留。新增菜单业务位于 `src/menu/`：公开读取已发布菜单，管理复用两名白名单；COS 使用独立 `menu/`。菜单接口、权限、Timer、首次初始化及写锁恢复详见 [菜单部署手册](../../docs/menu-cloud-deployment.md)。以下心愿夹兼容说明仍适用。
+
+礼品和装修好物的元数据、图片都保存在同一个私有 COS，不使用数据库；两者复用同一套白名单和会话鉴权，但使用互相隔离的索引、图片前缀和写锁。`gift-folder/index.json` schema v2 仍是礼品元数据的唯一真源，旧版路由和对象 Key 不变。
 
 ## 1. 创建私有 COS 存储桶
 
@@ -228,3 +230,11 @@ miniprogram/config/gift-cloud.js
 `POST /uploads/presign` 的短期 PUT 兼容窗口仍按 `LEGACY_PUT_UPLOAD_UNTIL` 管理，与本次保留的 `asset: thumbnail` POST Object 兼容能力是两件事，不要混淆。
 
 腾讯云官方参考：[PUT Object 禁止覆盖与版本控制](https://cloud.tencent.com/document/product/436/71307)、[POST Object 策略签名](https://cloud.tencent.com/document/product/436/54370)、[SCF Timer 触发器事件](https://cloud.tencent.com/document/product/583/9708)。
+## 菜单上云补充
+
+- SCF 无新增菜单环境变量，沿用原函数 URL、会话和两名白名单，COS_PREFIX 仍为 gift-folder；菜单固定独立 menu/。
+- CAM 保留心愿夹授权并增加 menu/* 的 GetObject、HeadObject、PutObject、PostObject、DeleteObject，桶级 GetBucket 列举前缀包含 menu/。
+- 公开 GET /menu 和 GET /menu/assets/{assetId} 在鉴权前单独路由；其他菜单管理均逐次校验白名单。不能把整个桶公开。
+- MenuImageCleanupDaily 与 GiftImageCleanupDaily 分开配置，分别清理对应业务；菜单保护草稿和全部历史（包括指针写入失败快照）。
+- 本地测试命令见 RUNBOOK；测试使用较新版 Node 的 --test-isolation=none，生产 Node 18 只运行入口代码。
+- 新版菜单及数据万象兼容代码尚待腾讯云部署、初始化和真机验证，准确进度见 memory/CURRENT.md。

@@ -7,7 +7,7 @@ export default [
     "name": "冰淇淋",
     "desc": "宝宝想吃哪家的，可以写在备注里",
     "price": "0",
-    "image": "../../assets/foods/ice-cream.jpg",
+    "image": "../assets/foods/ice-cream.jpg",
     "tags": [],
     "options": []
   },
@@ -18,7 +18,7 @@ export default [
     "name": "糖葫芦",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/Tanghulu.jpg",
+    "image": "../assets/foods/Tanghulu.jpg",
     "tags": [],
     "options": []
   },
@@ -29,7 +29,7 @@ export default [
     "name": "牛肉拉面",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/Ramen.jpg",
+    "image": "../assets/foods/Ramen.jpg",
     "tags": [],
     "options": [
       {
@@ -60,7 +60,7 @@ export default [
     "name": "榴莲",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/durian.jpg",
+    "image": "../assets/foods/durian.jpg",
     "tags": [
       "夏季",
       "热性",
@@ -75,7 +75,7 @@ export default [
     "name": "麦当劳",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/McDonald.jpg",
+    "image": "../assets/foods/McDonald.jpg",
     "tags": [
       "汉堡",
       "快餐"
@@ -89,7 +89,7 @@ export default [
     "name": "蛋糕",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/cake.jpg",
+    "image": "../assets/foods/cake.jpg",
     "tags": [],
     "options": []
   },
@@ -100,7 +100,7 @@ export default [
     "name": "香菇青菜包",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/Baozi01.jpg",
+    "image": "../assets/foods/Baozi01.jpg",
     "tags": [],
     "options": []
   },
@@ -111,7 +111,7 @@ export default [
     "name": "芒果爽",
     "desc": "芒果风味的清爽沙冰饮品，果香明亮，适合作为夏日甜品饮料展示。",
     "price": "0",
-    "image": "../../assets/foods/Come_Wanka01.jpg",
+    "image": "../assets/foods/Come_Wanka01.jpg",
     "tags": [
       "芒果",
       "沙冰"
@@ -152,7 +152,7 @@ export default [
     "name": "开心果茉莉椰",
     "desc": "无花果碎+茉莉针王+泰国椰皇水+开心果芝士建议不使用吸管，直接饮用体验更佳。",
     "price": "0",
-    "image": "../../assets/foods/MollyTea01.jpg",
+    "image": "../assets/foods/MollyTea01.jpg",
     "tags": [
       "椰香升级"
     ],
@@ -195,7 +195,7 @@ export default [
     "name": "云岭茉莉",
     "desc": "广西横州七窨茉莉花茶。",
     "price": "0",
-    "image": "../../assets/foods/MilkTea04.jpg",
+    "image": "../assets/foods/MilkTea04.jpg",
     "tags": [
       "冷链鲜奶"
     ],
@@ -249,7 +249,7 @@ export default [
     "name": "桃桃双皮奶",
     "desc": "七窨茉莉花茶融入新鲜蜜桃爆汁果肉，撞入Q弹的双皮奶和牛奶，满口茉莉清香而不腻，鲜甜爽口。",
     "price": "0",
-    "image": "../../assets/foods/MilkTea03.jpg",
+    "image": "../assets/foods/MilkTea03.jpg",
     "tags": [
       "Q弹奶冻",
       "清甜蜜桃"
@@ -301,7 +301,7 @@ export default [
     "name": "荔枝",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/lychee.jpg",
+    "image": "../assets/foods/lychee.jpg",
     "tags": [
       "夏季",
       "偏温热",
@@ -316,7 +316,7 @@ export default [
     "name": "椰子",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/coconut.jpg",
+    "image": "../assets/foods/coconut.jpg",
     "tags": [
       "夏季",
       "偏凉",
@@ -331,7 +331,7 @@ export default [
     "name": "肯德基",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/KFC.jpg",
+    "image": "../assets/foods/KFC.jpg",
     "tags": [
       "汉堡",
       "快餐"
@@ -345,7 +345,7 @@ export default [
     "name": "蛋挞",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/EggTart.jpg",
+    "image": "../assets/foods/EggTart.jpg",
     "tags": [],
     "options": []
   },
@@ -356,7 +356,7 @@ export default [
     "name": "豆沙包",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/Baozi01.jpg",
+    "image": "../assets/foods/Baozi01.jpg",
     "tags": [],
     "options": []
   },
@@ -367,7 +367,7 @@ export default [
     "name": "椰子清补凉",
     "desc": "椰香清爽的清补凉风味饮品，搭配椰奶冻、椰果和马蹄丸子，口感层次丰富。",
     "price": "0",
-    "image": "../../assets/foods/Come_Wanka01.jpg",
+    "image": "../assets/foods/Come_Wanka01.jpg",
     "tags": [
       "椰香",
       "清补凉"
@@ -430,7 +430,7 @@ export default [
     "name": "茉莉奶白",
     "desc": "茉莉龙芽+牛奶，搭配优质牛乳，甘醇鲜爽、香气悠长。",
     "price": "0",
-    "image": "../../assets/foods/MollyTea01.jpg",
+    "image": "../assets/foods/MollyTea01.jpg",
     "tags": [
       "招牌",
       "可选热饮"
@@ -477,7 +477,7 @@ export default [
     "name": "云深幽兰",
     "desc": "鲜打香草籽奶芙顶，奶芙受热易化。茶底以产自斯里兰卡的锡兰红茶为主，拼配中国云南及印度红茶。",
     "price": "0",
-    "image": "../../assets/foods/MilkTea04.jpg",
+    "image": "../assets/foods/MilkTea04.jpg",
     "tags": [
       "锡兰高山红茶"
     ],
@@ -537,7 +537,7 @@ export default [
     "name": "荔枝冰酿",
     "desc": "爷爷不泡茶首创，荔枝的鲜、冰酿的醇与花魁单丛的甘爽，碰撞层层鲜甜。孝感米酿升级，冰凉软的咀嚼惊喜。",
     "price": "0",
-    "image": "../../assets/foods/MilkTea03.jpg",
+    "image": "../assets/foods/MilkTea03.jpg",
     "tags": [
       "非遗米酿",
       "经典必喝"
@@ -590,7 +590,7 @@ export default [
     "name": "西瓜",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/watermelon.jpg",
+    "image": "../assets/foods/watermelon.jpg",
     "tags": [
       "夏季",
       "寒凉",
@@ -605,7 +605,7 @@ export default [
     "name": "绿茶餐厅",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/GreenTea.jpg",
+    "image": "../assets/foods/GreenTea.jpg",
     "tags": [
       "浙菜"
     ],
@@ -618,7 +618,7 @@ export default [
     "name": "詹记",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/zhanji.jpg",
+    "image": "../assets/foods/zhanji.jpg",
     "tags": [],
     "options": []
   },
@@ -629,7 +629,7 @@ export default [
     "name": "豆腐包",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/Baozi01.jpg",
+    "image": "../assets/foods/Baozi01.jpg",
     "tags": [],
     "options": []
   },
@@ -640,7 +640,7 @@ export default [
     "name": "芒果酸奶奶昔",
     "desc": "芒果果香和酸奶奶昔融合，口感绵密清甜，搭配西米更有咀嚼感。",
     "price": "0",
-    "image": "../../assets/foods/Come_Wanka01.jpg",
+    "image": "../assets/foods/Come_Wanka01.jpg",
     "tags": [
       "芒果",
       "酸奶"
@@ -684,7 +684,7 @@ export default [
     "name": "栀子奶白",
     "desc": "五斤栀子一斤茶，五倍栀香入茶，张扬释香。含:栀香绿茶+牛奶。",
     "price": "0",
-    "image": "../../assets/foods/MollyTea01.jpg",
+    "image": "../assets/foods/MollyTea01.jpg",
     "tags": [
       "可选热饮"
     ],
@@ -730,7 +730,7 @@ export default [
     "name": "超A芝士桃桃",
     "desc": "时令水蜜桃+桃汁+芝士奶盖+Q弹多肉+四季春乌龙，鲜活风味，严选龙泉驿等时令产区水蜜桃。",
     "price": "0",
-    "image": "../../assets/foods/MilkTea04.jpg",
+    "image": "../assets/foods/MilkTea04.jpg",
     "tags": [
       "手剥现捣",
       "Q弹多肉"
@@ -793,7 +793,7 @@ export default [
     "name": "空山栀子",
     "desc": "甄选乐山子，独特天然奶香，福建大白毫与四川毛峰双茶底，栀子与茶比例3:1!入口清新甘甜，回味温润奶香！",
     "price": "0",
-    "image": "../../assets/foods/MilkTea03.jpg",
+    "image": "../assets/foods/MilkTea03.jpg",
     "tags": [
       "三倍奶香",
       "喝栀子"
@@ -839,7 +839,7 @@ export default [
     "name": "蓝莓",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/blueberry.jpg",
+    "image": "../assets/foods/blueberry.jpg",
     "tags": [
       "夏季",
       "平性",
@@ -854,7 +854,7 @@ export default [
     "name": "汉堡王",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/hamburger.jpg",
+    "image": "../assets/foods/hamburger.jpg",
     "tags": [
       "汉堡",
       "快餐"
@@ -868,7 +868,7 @@ export default [
     "name": "塔斯汀",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/ta_si_ting.jpg",
+    "image": "../assets/foods/ta_si_ting.jpg",
     "tags": [
       "汉堡",
       "快餐"
@@ -882,7 +882,7 @@ export default [
     "name": "烤鱼",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/RoastFish.jpg",
+    "image": "../assets/foods/RoastFish.jpg",
     "tags": [
       "辣"
     ],
@@ -895,7 +895,7 @@ export default [
     "name": "馄饨",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/dumpling3.jpg",
+    "image": "../assets/foods/dumpling3.jpg",
     "tags": [],
     "options": [
       {
@@ -926,7 +926,7 @@ export default [
     "name": "满满橙意茶",
     "desc": "橙香清新的果茶饮品，酸甜明快，可选少冰、热饮或去冰。",
     "price": "0",
-    "image": "../../assets/foods/Come_Wanka01.jpg",
+    "image": "../assets/foods/Come_Wanka01.jpg",
     "tags": [
       "橙香",
       "果茶"
@@ -962,7 +962,7 @@ export default [
     "name": "白兰",
     "desc": "前调清竹叶香，中调清雅梨子香，尾调栗香熟乳香。含:兰香甘露+牛奶，热饮推荐五分糖。",
     "price": "0",
-    "image": "../../assets/foods/MollyTea01.jpg",
+    "image": "../assets/foods/MollyTea01.jpg",
     "tags": [
       "可选热饮"
     ],
@@ -1008,7 +1008,7 @@ export default [
     "name": "超A多肉葡萄",
     "desc": "现剥时令葡萄，搭配清冽茉莉花茶与Q弹多肉小料。",
     "price": "0",
-    "image": "../../assets/foods/MilkTea04.jpg",
+    "image": "../assets/foods/MilkTea04.jpg",
     "tags": [
       "现剥葡萄果肉"
     ],
@@ -1070,7 +1070,7 @@ export default [
     "name": "兰香青柠",
     "desc": "清冽鲜灵的白兰玉露茶汤融合鲜活青柠，最后撒上青柠皮碎，于绵密中散发清新果香，三重柠香一口感受！",
     "price": "0",
-    "image": "../../assets/foods/MilkTea03.jpg",
+    "image": "../assets/foods/MilkTea03.jpg",
     "tags": [
       "三重柠香"
     ],
@@ -1113,7 +1113,7 @@ export default [
     "name": "芒果",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/mango.jpg",
+    "image": "../assets/foods/mango.jpg",
     "tags": [
       "夏季",
       "偏温",
@@ -1128,7 +1128,7 @@ export default [
     "name": "火锅",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/hotpot.jpg",
+    "image": "../assets/foods/hotpot.jpg",
     "tags": [
       "奶茶搭子"
     ],
@@ -1141,7 +1141,7 @@ export default [
     "name": "水饺",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/sleep1.jpg",
+    "image": "../assets/foods/sleep1.jpg",
     "tags": [],
     "options": [
       {
@@ -1172,7 +1172,7 @@ export default [
     "name": "徽州酒酿",
     "desc": "带有酒酿香气的轻沙冰饮品，甜润柔和，搭配马蹄丸子增加口感。",
     "price": "0",
-    "image": "../../assets/foods/Come_Wanka01.jpg",
+    "image": "../assets/foods/Come_Wanka01.jpg",
     "tags": [
       "酒酿",
       "沙冰"
@@ -1216,7 +1216,7 @@ export default [
     "name": "抹茶白兰",
     "desc": "甄选抹茶粉及安佳奶油，现调抹茶芝士绵密柔滑。含:抹茶芝士+兰香甘露+牛奶。",
     "price": "0",
-    "image": "../../assets/foods/MollyTea01.jpg",
+    "image": "../assets/foods/MollyTea01.jpg",
     "tags": [
       "可选热饮"
     ],
@@ -1261,7 +1261,7 @@ export default [
     "name": "超A芝士葡萄",
     "desc": "现剥葡萄果肉+茉莉花茶+葡萄汁+芝士奶盖+多肉。",
     "price": "0",
-    "image": "../../assets/foods/MilkTea04.jpg",
+    "image": "../assets/foods/MilkTea04.jpg",
     "tags": [
       "果茶销冠"
     ],
@@ -1323,7 +1323,7 @@ export default [
     "name": "初恋玫瑰青提",
     "desc": "升级七套武汉茉莉茶底加入酸甜青提汁，入口果香、花香、茶香犹如清风席卷，看得到的青提果肉与马蹄丸子！",
     "price": "0",
-    "image": "../../assets/foods/MilkTea03.jpg",
+    "image": "../assets/foods/MilkTea03.jpg",
     "tags": [
       "手剥",
       "招牌"
@@ -1376,7 +1376,7 @@ export default [
     "name": "草莓",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/strawberry.jpg",
+    "image": "../assets/foods/strawberry.jpg",
     "tags": [
       "冬春",
       "偏凉",
@@ -1391,7 +1391,7 @@ export default [
     "name": "樱桃",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/cherry.jpg",
+    "image": "../assets/foods/cherry.jpg",
     "tags": [
       "春夏",
       "温性",
@@ -1406,7 +1406,7 @@ export default [
     "name": "烤肉",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/Barbecue.jpg",
+    "image": "../assets/foods/Barbecue.jpg",
     "tags": [],
     "options": []
   },
@@ -1417,7 +1417,7 @@ export default [
     "name": "黑全套奶茶",
     "desc": "卡旺卡经典奶茶，搭配黑糖布丁、芋圆和黑米等小料，口感扎实丰富。",
     "price": "0",
-    "image": "../../assets/foods/Come_Wanka01.jpg",
+    "image": "../assets/foods/Come_Wanka01.jpg",
     "tags": [
       "经典",
       "奶茶"
@@ -1486,7 +1486,7 @@ export default [
     "name": "开心小兰花",
     "desc": "兰香甘露融合海南椰子水，添加浓郁开心果芝士。含:兰香甘露+香椰水+开心果芝士+无花果碎。",
     "price": "0",
-    "image": "../../assets/foods/MollyTea01.jpg",
+    "image": "../assets/foods/MollyTea01.jpg",
     "tags": [
       "推荐"
     ],
@@ -1529,7 +1529,7 @@ export default [
     "name": "武汉茉莉",
     "desc": "升级后的武汉茉莉茶底，优质双莱莉与云南高山茶底大白毫，轻盈奶香之中又透着高昂茉莉花香。",
     "price": "0",
-    "image": "../../assets/foods/MilkTea03.jpg",
+    "image": "../assets/foods/MilkTea03.jpg",
     "tags": [
       "七窨茉莉",
       "轻盈奶香"
@@ -1575,7 +1575,7 @@ export default [
     "name": "桃子",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/peach.jpg",
+    "image": "../assets/foods/peach.jpg",
     "tags": [
       "夏季",
       "偏温",
@@ -1590,7 +1590,7 @@ export default [
     "name": "香蕉",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/banana.jpg",
+    "image": "../assets/foods/banana.jpg",
     "tags": [],
     "options": []
   },
@@ -1601,7 +1601,7 @@ export default [
     "name": "桂花酸奶",
     "desc": "桂花香与酸奶风味融合，清甜顺滑，搭配芋圆和桂花冰粉更有层次。",
     "price": "0",
-    "image": "../../assets/foods/Come_Wanka01.jpg",
+    "image": "../assets/foods/Come_Wanka01.jpg",
     "tags": [
       "桂花",
       "酸奶"
@@ -1653,7 +1653,7 @@ export default [
     "name": "针王苹果",
     "desc": "甄选苹果汁，饱含充盈汁水的郁果香，融入高等级的茉莉针王，含:莱莉针王+红苹果汁+牛奶。",
     "price": "0",
-    "image": "../../assets/foods/MollyTea01.jpg",
+    "image": "../assets/foods/MollyTea01.jpg",
     "tags": [
       "原创"
     ],
@@ -1698,7 +1698,7 @@ export default [
     "name": "白兰玉露",
     "desc": "甄选白兰中上等佳品“建兰”，拼配湖北名茶、恩施城市名片--恩施玉露，经清甜牛奶融合后丝滑入口。",
     "price": "0",
-    "image": "../../assets/foods/MilkTea03.jpg",
+    "image": "../assets/foods/MilkTea03.jpg",
     "tags": [
       "恩施玉露",
       "馥郁兰香"
@@ -1744,7 +1744,7 @@ export default [
     "name": "梨",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/pear.jpg",
+    "image": "../assets/foods/pear.jpg",
     "tags": [
       "秋季",
       "偏凉",
@@ -1759,7 +1759,7 @@ export default [
     "name": "杨枝甘露",
     "desc": "芒果与柑橘风味的经典甜品饮品，搭配西柚粒和西米，清甜有果香。",
     "price": "0",
-    "image": "../../assets/foods/Come_Wanka01.jpg",
+    "image": "../assets/foods/Come_Wanka01.jpg",
     "tags": [
       "芒果",
       "经典"
@@ -1815,7 +1815,7 @@ export default [
     "name": "针王葡萄",
     "desc": "沁甜馥郁的夏黑葡萄汁，融入七窨茉莉针王，再与醇滑牛乳相遇，含:夏黑葡萄汁+茉莉针王+牛奶。",
     "price": "0",
-    "image": "../../assets/foods/MollyTea01.jpg",
+    "image": "../assets/foods/MollyTea01.jpg",
     "tags": [
       "原创"
     ],
@@ -1860,7 +1860,7 @@ export default [
     "name": "咸宁桂花",
     "desc": "咸宁，桂花之乡。首配洞庭碧螺春茶，融合牧场牛奶丝滑口感，敢问茶友千年古桂城结的桂花是什么味道?",
     "price": "0",
-    "image": "../../assets/foods/MilkTea03.jpg",
+    "image": "../assets/foods/MilkTea03.jpg",
     "tags": [
       "桂花之乡",
       "清雅桂香"
@@ -1906,7 +1906,7 @@ export default [
     "name": "葡萄",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/grape.jpg",
+    "image": "../assets/foods/grape.jpg",
     "tags": [
       "夏秋",
       "平性",
@@ -1921,7 +1921,7 @@ export default [
     "name": "桂花酒酿小丸子",
     "desc": "桂花香、酒酿和小料组合的甜润饮品，可搭配芋圆和桂花冰粉，口感软糯清香。",
     "price": "0",
-    "image": "../../assets/foods/Come_Wanka01.jpg",
+    "image": "../assets/foods/Come_Wanka01.jpg",
     "tags": [
       "桂花",
       "酒酿"
@@ -1978,7 +1978,7 @@ export default [
     "name": "抹茶针王",
     "desc": "甄选抹茶粉及安佳奶油，现调抹茶芝士绵密柔滑。含:抹茶芝士+茉莉针王+牛奶。",
     "price": "0",
-    "image": "../../assets/foods/MollyTea01.jpg",
+    "image": "../assets/foods/MollyTea01.jpg",
     "tags": [
       "全新升级"
     ],
@@ -2023,7 +2023,7 @@ export default [
     "name": "红苹果",
     "desc": "七音茉莉绿茶遇见精选红富士苹果汁，花香茶香果香自然细密交融，搭配醇厚牛奶，顺滑入喉。",
     "price": "0",
-    "image": "../../assets/foods/MilkTea03.jpg",
+    "image": "../assets/foods/MilkTea03.jpg",
     "tags": [
       "浓郁果香"
     ],
@@ -2067,7 +2067,7 @@ export default [
     "name": "火龙果",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/dragon_fruit.jpg",
+    "image": "../assets/foods/dragon_fruit.jpg",
     "tags": [
       "夏秋",
       "偏凉",
@@ -2082,7 +2082,7 @@ export default [
     "name": "满杯猕猴桃",
     "desc": "猕猴桃果香清爽，酸甜开胃，搭配冰粉带来轻盈顺滑的口感。",
     "price": "0",
-    "image": "../../assets/foods/Come_Wanka01.jpg",
+    "image": "../assets/foods/Come_Wanka01.jpg",
     "tags": [
       "猕猴桃",
       "果茶"
@@ -2126,7 +2126,7 @@ export default [
     "name": "茉莉针王",
     "desc": "中国茶叶流通协会认证金奖茉莉茶底!采用等级更高的茉莉针王为茶底，含:茉莉针王+牛奶",
     "price": "0",
-    "image": "../../assets/foods/MollyTea01.jpg",
+    "image": "../assets/foods/MollyTea01.jpg",
     "tags": [
       "金奖茉莉",
       "可做热饮"
@@ -2173,7 +2173,7 @@ export default [
     "name": "橙子",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/orange.jpg",
+    "image": "../assets/foods/orange.jpg",
     "tags": [
       "秋冬",
       "偏凉",
@@ -2188,7 +2188,7 @@ export default [
     "name": "针王冰茶",
     "desc": "高等级的茉莉针王，前调茉莉花香，中调嫩香毫香显露，尾调冰糖感微甜。含:茉莉针王。",
     "price": "0",
-    "image": "../../assets/foods/MollyTea01.jpg",
+    "image": "../assets/foods/MollyTea01.jpg",
     "tags": [
       "纯茶生香"
     ],
@@ -2232,7 +2232,7 @@ export default [
     "name": "菠萝",
     "desc": "",
     "price": "0",
-    "image": "../../assets/foods/pineapple.jpg",
+    "image": "../assets/foods/pineapple.jpg",
     "tags": [
       "春夏",
       "平性",
@@ -2247,7 +2247,7 @@ export default [
     "name": "茉莉椰冰茶",
     "desc": "采用高等级的茉莉针王，搭配泰国香椰水，含:茉莉针王+香椰水。",
     "price": "0",
-    "image": "../../assets/foods/MollyTea01.jpg",
+    "image": "../assets/foods/MollyTea01.jpg",
     "tags": [
       "纯茶生香"
     ],
@@ -2291,7 +2291,7 @@ export default [
     "name": "栀子冰茶",
     "desc": "栀子系列茶底新升级，五斤栀子窨一斤茶，五倍香入茶。尾调干净鲜灵。含:栀香绿茶。",
     "price": "0",
-    "image": "../../assets/foods/MollyTea01.jpg",
+    "image": "../assets/foods/MollyTea01.jpg",
     "tags": [
       "纯茶生香"
     ],

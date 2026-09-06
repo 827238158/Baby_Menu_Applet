@@ -6,7 +6,7 @@ const path = require('node:path')
 const test = require('node:test')
 const vm = require('node:vm')
 
-const PAGE_PATH = path.join(__dirname, '..', 'miniprogram', 'pages', 'menu', 'menu.js')
+const PAGE_PATH = path.join(__dirname, '..', 'miniprogram', 'services', 'menu-page.js')
 const STORAGE_KEY = 'baby_menu_cart_v1'
 const MENU_DATA = {
   shop: { name: '测试菜单' },
@@ -81,12 +81,10 @@ function createWxMock(storedItems) {
 function loadPage(wxMock) {
   let definition
   const source = fs.readFileSync(PAGE_PATH, 'utf8')
-    .replace(
-      "import menuData from '../../data/menu-data.js'",
-      'const menuData = __menuData'
-    )
   const sandbox = {
     __menuData: MENU_DATA,
+    module: { exports: {} },
+    require: require('node:module').createRequire(PAGE_PATH),
     console,
     Page(config) {
       definition = config
@@ -97,6 +95,7 @@ function loadPage(wxMock) {
   }
 
   vm.runInNewContext(source, sandbox, { filename: PAGE_PATH })
+  definition = sandbox.module.exports.createMenuPage({ initialMenu: MENU_DATA, wxApi: wxMock })
   const page = Object.assign({}, definition)
   page.data = JSON.parse(JSON.stringify(definition.data))
   page.setData = function setData(patch, callback) {

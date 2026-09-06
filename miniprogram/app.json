@@ -1,7 +1,9 @@
 {
   "pages": [
     "pages/menu/menu",
-    "pages/gifts/gifts"
+    "pages/gifts/gifts",
+    "pages/menu-admin/menu-admin",
+    "pages/menu-preview/menu-preview"
   ],
   "window": {
     "navigationBarTitleText": "宝宝菜单",

@@ -1,3 +1,4 @@
 {
-  "navigationBarTitleText": "瘦瘦宝宝"
+  "navigationBarTitleText": "瘦瘦宝宝",
+  "enablePullDownRefresh": false
 }
