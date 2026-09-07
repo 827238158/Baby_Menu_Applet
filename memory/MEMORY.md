@@ -5,7 +5,7 @@
 ## 稳定事实
 
 - 技术栈为微信原生小程序 WXML、WXSS、JavaScript、JSON；公开页 pages/menu/menu、管理页 pages/menu-admin/menu-admin、预览页 pages/menu-preview/menu-preview，共用 services/menu-page.js 和公开页 WXML/WXSS。
-- 上云后菜单唯一真源是 COS menu/；日常从管理页维护。Excel、生成 JS 及旧图片是一次性迁移源，位于 `tools/menu-workbook/`，不会进入小程序代码包；工具位于 tools/menu-cloud/，流程见 CUSTOMIZATION。
+- 上云后菜单唯一真源是 COS menu/；日常从管理页维护。旧 Excel 转换和首次迁移工具已淘汰，Excel 与图片只作本机备份且不受 Git 跟踪。
 - 菜单资料云端维护，购物车、数量和合计仍是本地展示状态，无支付或真实订单，price 保持字符串 '0'。预览购物车不写真实缓存。
 - 心愿夹使用独立 SCF + 私有 COS，不使用数据库，仅允许两名 OpenID 白名单用户访问；后端入口为 `serverless/gift-api/index.main_handler`，前端云端配置为 `miniprogram/config/gift-cloud.js`。
 - 礼品元数据以 `gift-folder/index.json` schema v2 为唯一真源，装修好物使用 `gift-folder/decor/index.json` schema v2；新建图片和写锁仍按两区命名空间隔离。收藏项可通过 `/collections/items/{id}/move` 保留 ID 和图片 Key 跨区移动，因此清理任务必须合并两份索引保护图片。礼品 `gifts/*.json` 只作 v1 回滚备份。写锁依赖 `x-cos-forbid-overwrite:true`，生产 COS 版本控制必须保持暂停。
@@ -33,7 +33,7 @@ memory/CURRENT.md
 - 菜单表字段、标签、规格、日常维护步骤：读 `CUSTOMIZATION.md`。
 - 重要操作、部署、迁移、恢复和长期决策：读 `memory/LOG.md`。
 - 心愿夹后端部署、环境变量、权限或迁移：先读 `serverless/gift-api/README.md`，再按需搜索当前实现。
-- 菜单权限、发布/回退、锁和清理：读 docs/menu-cloud-deployment.md；初始化读 tools/menu-cloud/README.md。
+- 菜单权限、创建、发布/回退、锁和清理：读 docs/menu-cloud-deployment.md。
 - 具体实现影响：用 `rg` 搜索源码、样式和调用方；代码搜索决定真实影响面。
 
 ## 记忆写入路由

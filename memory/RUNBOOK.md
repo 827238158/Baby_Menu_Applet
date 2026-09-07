@@ -1,23 +1,5 @@
 # 运行手册
 
-## 旧菜单数据生成
-
-仅用于修复旧迁移源，不更新线上菜单。修改 Excel 后，在项目根目录运行：
-
-```powershell
-node tools\generate-menu-data.js
-```
-
-该命令会生成仅供迁移核对的资料：
-
-```text
-tools/menu-workbook/generated/shop-data.js
-tools/menu-workbook/generated/category-data.js
-tools/menu-workbook/generated/dish-data.js
-```
-
-生成资料不会进入小程序代码包，也不会同步到云端。
-
 ## 语法检查
 
 ```powershell
@@ -25,15 +7,6 @@ node --check miniprogram\pages\menu\menu.js
 node --check miniprogram\pages\gifts\gifts.js
 node --check miniprogram\services\gift-api.js
 node --check miniprogram\config\gift-cloud.js
-node --check tools\menu-workbook\generated\shop-data.js
-node --check tools\menu-workbook\generated\category-data.js
-node --check tools\menu-workbook\generated\dish-data.js
-```
-
-## 数据聚合检查
-
-```powershell
-node --input-type=module -e "Promise.all(['shop','category','dish'].map((name)=>import('./tools/menu-workbook/generated/'+name+'-data.js'))).then(([shop,categories,dishes])=>console.log(shop.default.name,categories.default.length,dishes.default.length))"
 ```
 
 ## 空白检查
@@ -45,7 +18,7 @@ git diff --check
 ## 全量本地测试
 
 ```powershell
-node --test --test-isolation=none minitest/*.test.cjs tools/menu-cloud/migration.test.cjs
+node --test --test-isolation=none minitest/*.test.cjs
 Set-Location serverless\gift-api
 npm test
 npm run check
@@ -70,13 +43,9 @@ tar.exe -tf gift-api.zip | Select-String -Pattern '^(index.js|src/app.js|package
 
 部署参数、运行角色、环境变量、OpenID 发现模式和合法域名见 `serverless/gift-api/README.md`。
 
-## 菜单迁移与发布
+## 菜单创建与发布
 
-```powershell
-node tools/menu-cloud/migrate.cjs --check
-```
-
-上述只读检查通过后，首次云端初始化才使用 `--execute`；凭据、权限和不覆盖约束见 [工具说明](../tools/menu-cloud/README.md)，后台操作和失败恢复见 [菜单部署手册](../docs/menu-cloud-deployment.md)。不要在初始化前发布新小程序。
+旧 Excel 转换和首次迁移工具已淘汰。首次使用时，由白名单管理员在菜单管理页创建内容、保存草稿、预览并发布；权限、失败恢复与验收见 [菜单部署手册](../docs/menu-cloud-deployment.md)。
 
 菜单新增脚本语法检查：
 
@@ -89,7 +58,6 @@ node --check miniprogram/services/menu-cloud-page.js
 node --check miniprogram/services/menu-page.js
 node --check miniprogram/pages/menu-admin/menu-admin.js
 node --check miniprogram/pages/menu-preview/menu-preview.js
-node --check tools/menu-cloud/migrate.cjs
 ```
 
 本机测试命令使用支持 `--test-isolation=none` 的 Node；SCF Node 18 执行生产入口，不运行本机测试命令。不得据本机测试推断已经完成 SCF 真机验证。

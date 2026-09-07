@@ -17,5 +17,5 @@ serverless/gift-api/.env
 # WeChat DevTools local private config
 project.private.config.json
 
-# Local menu workbook source
-tools/menu-workbook/menu-data.xlsx
+# Local legacy menu backups
+tools/menu-workbook/

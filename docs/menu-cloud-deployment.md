@@ -21,7 +21,7 @@
 | 桶列举 | 桶级 `cos:GetBucket` 只允许菜单前缀；CAM 条件中的 `/` 必须 URL 编码，使用 `"string_equal": { "cos:prefix": "menu%2F" }`；不授权账号下全部桶 |
 | 数据万象 | 绑定同一桶，允许读取原图和持久化写入缩略图；真机确认产出 WebP |
 | 函数 URL | 保持公网开放，应用层保护管理与心愿夹接口，只放行已发布菜单 |
-| 超时 | 保持 60 秒，观察图片处理与清理耗时；初始化在本机工具执行 |
+| 超时 | 保持 60 秒，观察图片处理与清理耗时 |
 | 新 Timer | 名称必须为 `MenuImageCleanupDaily`，每天低峰执行一次，目标仍是现有处理函数 |
 | 旧 Timer | 保留 `GiftImageCleanupDaily`，不改成菜单触发器 |
 | 微信合法域名 | SCF 为 `request`；COS 为 `uploadFile`、`downloadFile`；域名未变时核验即可 |
@@ -35,27 +35,11 @@
 1. 按 [RUNBOOK](../memory/RUNBOOK.md) 测试、校验与打包，核对 ZIP 包含 `src/menu/` 和两类持久化缩略图路由。
 2. 腾讯云 SCF 控制台上传新 ZIP 并完成部署。
 3. 检查 `/health`，匿名请求 `/menu`：未初始化时应返回 `MENU_NOT_PUBLISHED`，不能是“接口不存在”。验证心愿夹旧客户端和礼品、装修两条缩略图链路。
-4. 按 [迁移工具说明](../tools/menu-cloud/README.md) 运行只读检查，取得仅限目标桶与菜单前缀的临时凭据，执行首次初始化。工具额外需要桶级 `cos:GetBucketVersioning`。
-5. 核对 `menu/draft.json`、`menu/current.json`、首个快照和图片。本地基线为 16 分类、71 菜品、39 张去重图片，展示层另有每分类“其他”。
+4. 旧 Excel 转换和首次迁移工具已淘汰。两名白名单用户之一进入菜单管理页，创建内容、保存草稿、预览并发布首个菜单。
+5. 核对 `menu/draft.json`、`menu/current.json`、首个快照和图片。
 6. 使用体验版完成下述真机验收，再发布新版小程序。菜单后端或初始化未成功时不要发布新前端。
 7. 设置费用预算、SCF 错误/调用量、COS 下行流量告警，观察两类 Timer 日志。阈值按实际用量设置，告警不是自动费用上限。
 
-首次迁移的最小权限策略中，`cos:GetBucket` 的资源仍是桶资源，前缀限制放在 Condition；已验证的条件写法如下。直接写 `menu/` 或 `menu/*` 会导致带 `Prefix: 'menu/'` 的列举请求返回 403。
-
-```json
-{
-  "action": ["cos:GetBucket"],
-  "condition": {
-    "string_equal": {
-      "cos:prefix": "menu%2F"
-    }
-  },
-  "effect": "allow",
-  "resource": [
-    "qcs::cos:ap-shanghai:uid/1458752190:baby-gift-folder-1458752190/*"
-  ]
-}
-```
 
 ## 接口与存储
 

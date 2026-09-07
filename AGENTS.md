@@ -28,7 +28,7 @@ memory/CURRENT.md
 - UI、布局、视觉、组件：读 `DESIGN.md`。
 - 启动、生成、检查、构建、预览：读 `memory/RUNBOOK.md`。
 - 编码、环境、Excel、图片、微信小程序限制等反复踩坑：读 `memory/PITFALLS.md`。
-- 菜单维护细节：读 `CUSTOMIZATION.md`，再按需检查 `tools/menu-workbook/menu-data.xlsx` 和生成脚本。
+- 菜单维护细节：读 `CUSTOMIZATION.md`。
 - 实现影响面：用 `rg` 搜索代码中的符号、页面、样式、调用方和测试；文档只提供意图和边界，代码搜索决定真实影响面。
 
 ## 项目边界
@@ -44,17 +44,12 @@ memory/CURRENT.md
 
 - 微信原生小程序：WXML、WXSS、JavaScript、JSON。
 - 主入口页面：`miniprogram/pages/menu/menu`。
-- 线上菜单请求入口：`miniprogram/services/menu-api.js`；旧迁移资料位于 `tools/menu-workbook/`，不进入小程序代码包。
+- 线上菜单请求入口：`miniprogram/services/menu-api.js`；菜单由白名单管理员在小程序内维护。
 - 使用微信开发者工具导入仓库根目录预览。
 
 ## 关键文件
 
 ```text
-tools/menu-workbook/menu-data.xlsx
-tools/generate-menu-data.js
-tools/generate-menu-data.py
-tools/menu-workbook/generated/
-tools/menu-workbook/assets/
 miniprogram/pages/menu/menu.js
 miniprogram/pages/menu/menu.wxml
 miniprogram/pages/menu/menu.wxss
@@ -62,7 +57,6 @@ miniprogram/pages/menu-admin/
 miniprogram/pages/menu-preview/
 miniprogram/services/menu-api.js
 serverless/gift-api/src/menu/
-tools/menu-cloud/
 docs/menu-cloud-deployment.md
 miniprogram/assets/
 CUSTOMIZATION.md
@@ -76,10 +70,7 @@ memory/
 - 日常使用小程序菜单管理，云端为唯一真源；保存共享草稿后预览发布，历史恢复先替换草稿再发布。
 - 菜单后端独立放在 `serverless/gift-api/src/menu/`；保持原部署入口，COS 使用独立 `menu/` 前缀，不能混入心愿夹索引或清理。
 - 全部发布快照及其图片保留，菜单锁不自动抢占；部署与恢复先读 `docs/menu-cloud-deployment.md`。
-- `tools/menu-workbook/` 下的 Excel、生成 JS 和图片是旧迁移源；除非明确修复迁移资料，不手改或重新生成。
-- 旧工作簿包含 Shop、Categories、Dishes。旧 imageFile 只填文件名，不能填 Windows 绝对路径。
-- 修复旧源时按 RUNBOOK“旧菜单数据生成”执行；首次上云使用 `tools/menu-cloud/`，禁止覆盖非空菜单命名空间。
-- 旧 generate-menu-data.js 寻找 Python，generate-menu-data.py 读取 Excel，menu-data.js 聚合排序；这些脚本不会更新云端。
+- 旧 Excel 转换和首次迁移工具已淘汰；旧 Excel 与图片仅作本机备份，不参与运行、部署或 Git 跟踪。
 
 ## 记忆更新规则
 

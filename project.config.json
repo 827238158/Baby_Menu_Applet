@@ -19,15 +19,10 @@
     "condition": {},
     "libVersion": "3.16.1",
     "srcMiniprogramRoot": "miniprogram/",
-    "packOptions": {
-        "ignore": [
-            {
-                "type": "folder",
-                "value": "assets/backgrounds"
-            }
-        ],
-        "include": []
-    },
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
     "editorSetting": {
         "tabIndent": "insertSpaces",
         "tabSize": 4

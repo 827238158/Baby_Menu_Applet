@@ -12,16 +12,6 @@
   Cause: 终端编码显示问题，不一定代表文件内容损坏。
   Recovery: 不要仅凭终端输出判断；检查 JS 语法时让 Node 直接读取文件路径，避免用管道传中文文件内容。
 
-## 菜单数据与图片
-
-- Trigger: 想直接编辑 `tools/menu-workbook/generated/*.js`。
-  Cause: 这些文件由 Excel 和生成脚本产出，手改容易被覆盖。
-  Recovery: 上云后从菜单管理页维护。仅明确修复旧迁移源时才修改 Excel 并运行生成脚本；它不会同步云端。
-
-- Trigger: 商品图片路径在小程序里加载失败。
-  Cause: `Dishes.imageFile` 写入了 Windows 绝对路径或错误路径。
-  Recovery: 商品图片放到 `tools/menu-workbook/assets/foods/`，`imageFile` 只填文件名；留空则使用迁移占位标记。
-
 ## 产品与发布边界
 
 - Trigger: 想把展示页扩展成真实下单系统。
