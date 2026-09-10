@@ -1,0 +1,87 @@
+<view class="page">
+  <view wx:if="{{!ready}}" class="loading">正在准备菜品资料…</view>
+  <block wx:else>
+    <view wx:if="{{error}}" class="notice">{{error}}</view>
+
+    <view class="section">
+      <view class="section-title">基本信息</view>
+      <view id="dish-name" class="field {{fieldErrors['dish-name'] ? 'has-error' : ''}}">
+        <view class="label">菜名</view>
+        <input value="{{dish.name}}" data-field="name" data-field-id="dish-name" bindinput="changeField" disabled="{{uploading}}" maxlength="80" placeholder="输入菜品名称" />
+        <view wx:if="{{fieldErrors['dish-name']}}" class="field-error">{{fieldErrors['dish-name']}}</view>
+      </view>
+      <view class="field">
+        <view class="label">简介</view>
+        <textarea value="{{dish.desc}}" data-field="desc" data-field-id="dish-desc" bindinput="changeField" disabled="{{uploading}}" maxlength="2000" auto-height placeholder="食材、口味或准备方式" />
+      </view>
+      <view id="dish-category" class="field {{fieldErrors['dish-category'] ? 'has-error' : ''}}">
+        <view class="label">分类</view>
+        <picker range="{{categoryNames}}" value="{{categoryIndex}}" bindchange="chooseCategory" disabled="{{uploading}}">
+          <view class="input picker-value"><text>{{categoryNames[categoryIndex] || '请选择分类'}}</text><text class="chevron">›</text></view>
+        </picker>
+        <view wx:if="{{fieldErrors['dish-category']}}" class="field-error">{{fieldErrors['dish-category']}}</view>
+      </view>
+      <view class="field">
+        <view class="label">标签<text class="label-hint">用逗号分隔</text></view>
+        <input value="{{tagsText}}" bindinput="changeTags" disabled="{{uploading}}" maxlength="300" placeholder="清爽，夏季" />
+      </view>
+      <view class="visibility-setting">
+        <view class="visibility-copy"><view class="visibility-title">在公开菜单中显示</view><view class="visibility-help">{{dish.enabled !== false ? '开启：保存并发布后，访客可以看到这道菜' : '关闭：保存并发布后隐藏，菜品资料仍会保留'}}</view></view>
+        <switch checked="{{dish.enabled !== false}}" data-field="enabled" data-field-id="dish-enabled" bindchange="changeField" disabled="{{uploading}}" color="#d97a8a" />
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">菜品图片</view>
+      <view class="image-field {{uploading ? 'is-uploading' : ''}}">
+        <button class="image-picker" bindtap="chooseImage" disabled="{{uploading}}" aria-label="{{dish.imageAssetId ? '更换菜品图片' : '添加菜品图片'}}">
+          <image wx:if="{{imageUrl}}" class="dish-image" src="{{imageUrl}}" mode="aspectFill" binderror="handleImageError" />
+          <view wx:else class="image-empty"><text wx:if="{{!dish.imageAssetId}}" class="image-add">＋</text><text>{{dish.imageAssetId ? (imageLoadFailed ? '图片暂不可用，点击可更换' : '正在加载图片…') : '拍照或选择图片'}}</text></view>
+          <view wx:if="{{imageUrl && !uploading}}" class="image-caption">点击更换图片</view>
+          <view wx:if="{{uploading}}" class="upload-mask"><view class="spinner"></view><text>正在上传并处理…</text></view>
+        </button>
+        <view wx:if="{{dish.imageAssetId && !uploading}}" class="image-remove" aria-role="button" aria-label="移除菜品图片" catchtap="removeImage"><view class="cross-line"></view><view class="cross-line cross-line-alt"></view></view>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-title">规格与备注</view>
+      <view wx:if="{{!dish.options.length}}" class="muted">按需添加口味选择或文字备注。</view>
+      <view wx:for="{{dish.options}}" wx:for-item="option" wx:for-index="optionIndex" wx:key="id" class="option-card">
+        <view class="option-heading"><text>{{option.type === 'text' ? '文字备注' : '单项选择'}}</text><button class="text-button danger" data-index="{{optionIndex}}" bindtap="removeOption" disabled="{{uploading}}">删除</button></view>
+        <view id="option-{{optionIndex}}-name" class="field {{fieldErrors['option-' + optionIndex + '-name'] ? 'has-error' : ''}}">
+          <view class="label">{{option.type === 'text' ? '备注名称' : '规格名称'}}</view>
+          <input value="{{option.name}}" data-index="{{optionIndex}}" data-field="name" data-field-id="option-{{optionIndex}}-name" bindinput="changeOptionField" disabled="{{uploading}}" maxlength="80" placeholder="例如：辣度" />
+          <view wx:if="{{fieldErrors['option-' + optionIndex + '-name']}}" class="field-error">{{fieldErrors['option-' + optionIndex + '-name']}}</view>
+        </view>
+        <view class="switch-row compact"><text>必填</text><switch checked="{{option.required}}" data-index="{{optionIndex}}" data-field="required" data-field-id="option-{{optionIndex}}-required" bindchange="changeOptionField" disabled="{{uploading}}" color="#d97a8a" /></view>
+        <block wx:if="{{option.type === 'text'}}">
+          <view class="field"><view class="label">填写提示</view><input value="{{option.placeholder}}" data-index="{{optionIndex}}" data-field="placeholder" bindinput="changeOptionField" disabled="{{uploading}}" placeholder="例如：少盐、不放香菜" /></view>
+          <view id="option-{{optionIndex}}-maxlength" class="field {{fieldErrors['option-' + optionIndex + '-maxlength'] ? 'has-error' : ''}}">
+            <view class="label">最多填写字数</view>
+            <input type="number" value="{{option.maxlength}}" data-index="{{optionIndex}}" data-field="maxlength" data-field-id="option-{{optionIndex}}-maxlength" bindinput="changeOptionField" disabled="{{uploading}}" />
+            <view wx:if="{{fieldErrors['option-' + optionIndex + '-maxlength']}}" class="field-error">{{fieldErrors['option-' + optionIndex + '-maxlength']}}</view>
+          </view>
+        </block>
+        <block wx:else>
+          <view id="option-{{optionIndex}}-choices" class="label">可选项</view>
+          <view wx:for="{{option.choices}}" wx:for-item="choice" wx:for-index="choiceIndex" wx:key="id" id="option-{{optionIndex}}-choice-{{choiceIndex}}" class="choice-row {{fieldErrors['option-' + optionIndex + '-choice-' + choiceIndex] ? 'has-error' : ''}}">
+            <input value="{{choice.name}}" data-option="{{optionIndex}}" data-choice="{{choiceIndex}}" bindinput="changeChoice" disabled="{{uploading}}" maxlength="80" placeholder="选项名称，如微辣" />
+            <button class="text-button danger" data-option="{{optionIndex}}" data-choice="{{choiceIndex}}" bindtap="removeChoice" disabled="{{uploading}}">移除</button>
+            <view wx:if="{{fieldErrors['option-' + optionIndex + '-choice-' + choiceIndex]}}" class="field-error full">{{fieldErrors['option-' + optionIndex + '-choice-' + choiceIndex]}}</view>
+          </view>
+          <view wx:if="{{fieldErrors['option-' + optionIndex + '-choices']}}" class="field-error">{{fieldErrors['option-' + optionIndex + '-choices']}}</view>
+          <button class="secondary wide" data-index="{{optionIndex}}" bindtap="addChoice" disabled="{{uploading}}">＋ 添加选项</button>
+        </block>
+      </view>
+      <view class="option-actions"><button class="secondary" data-type="choice" bindtap="addOption" disabled="{{uploading}}">＋ 选择规格</button><button class="secondary" data-type="text" bindtap="addOption" disabled="{{uploading}}">＋ 文字备注</button></view>
+    </view>
+
+    <view wx:if="{{mode === 'edit'}}" class="danger-zone">
+      <view><view class="danger-title">删除菜品</view><view class="muted">删除后仍需保存草稿并重新发布。</view></view>
+      <button class="delete-button" bindtap="deleteDish" disabled="{{uploading}}">删除</button>
+    </view>
+
+    <view class="footer"><button class="complete-button" bindtap="complete" disabled="{{uploading}}" loading="{{uploading}}">完成</button></view>
+  </block>
+</view>

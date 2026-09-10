@@ -16,11 +16,12 @@ const document = () => ({ schemaVersion: 1, shop: { name: '宝宝菜单' }, cate
 function makeWx() {
   const storage = new Map()
   return {
-    storage, toasts: [], navigations: 0,
+    storage, toasts: [], navigations: 0, hiddenShareMenus: 0, navigationBarTitle: '',
     getStorageSync(key) { return storage.get(key) },
     setStorageSync(key, value) { storage.set(key, clone(value)) },
     removeStorageSync(key) { storage.delete(key) },
-    showShareMenu() {}, hideShareMenu() {}, stopPullDownRefresh() {},
+    showShareMenu() {}, hideShareMenu() { this.hiddenShareMenus++ }, stopPullDownRefresh() {},
+    setNavigationBarTitle({ title }) { this.navigationBarTitle = title },
     showToast(value) { this.toasts.push(value.title) },
     showModal({ success }) { success({ confirm: true }) },
     navigateBack() { this.navigations++ },
@@ -28,14 +29,14 @@ function makeWx() {
   }
 }
 
-function makePage(wx, api, preview = false) {
+function makePage(wx, api, preview = false, query = {}) {
   const filename = path.resolve(__dirname, '../miniprogram/services/menu-page.js')
   const sandbox = { module: { exports: {} }, require: createRequire(filename), wx, console, setTimeout, clearTimeout }
   vm.runInNewContext(fs.readFileSync(filename, 'utf8'), sandbox)
   const page = sandbox.module.exports.createMenuPage({ api, preview, wxApi: wx })
   page.data = clone(page.data)
   page.setData = (patch, done) => { Object.assign(page.data, patch); if (done) done() }
-  page.onLoad()
+  page.onLoad(query)
   return page
 }
 
@@ -127,6 +128,89 @@ test('草稿预览隔离真实购物车，权限失效后清空全部私有内�
   assert.equal(page.data.hasMenu, false)
   assert.equal(page.data.selectedItems.length, 0)
   assert.equal(page.menuSnapshot, null)
+})
+
+test('历史版本使用私有快照和私有图片，只读刷新且隔离真实购物车', async () => {
+  const wx = makeWx()
+  const cart = [{ id: 'rice', quantity: 4, optionSelections: {} }]
+  wx.storage.set('baby_menu_cart_v1', cart)
+  const doc = document()
+  doc.dishes[0].imageAssetId = 'rice-image'
+  doc.assets['rice-image'] = { imageKey: 'menu/images/rice.jpg' }
+  const calls = { releases: [], previews: 0, menus: 0, publishes: 0, assets: [] }
+  const api = {
+    getRelease: async (version) => { calls.releases.push(version); return { version, document: doc } },
+    getPreview: async () => { calls.previews++; return { revision: 2, document: doc } },
+    getMenu: async () => { calls.menus++; return { version: 'current', document: doc } },
+    publish: async () => { calls.publishes++ },
+    resolveAsset: async (id, privateAccess) => {
+      calls.assets.push({ id, privateAccess })
+      return { thumbnailUrl: 'https://example.test/' + id, expiresAt: Date.now() + 3600000 }
+    }
+  }
+  const page = makePage(wx, api, true, { version: 'v-old' })
+  await page.menuRefreshPromise
+  assert.equal(page.data.historyPreview, true)
+  assert.match(page.data.previewIdentityText, /历史版本预览/)
+  assert.match(page.data.cloudStatus, /只读预览/)
+  assert.deepEqual(calls.releases, ['v-old'])
+  assert.equal(calls.previews, 0)
+  assert.equal(calls.menus, 0)
+  assert.deepEqual(calls.assets, [{ id: 'rice-image', privateAccess: true }])
+  assert.equal(wx.hiddenShareMenus, 1)
+  assert.equal(wx.navigationBarTitle, '历史版本预览')
+
+  page.addDish({ currentTarget: { dataset: { id: 'rice' } } })
+  assert.equal(page.data.selectedCount, 1)
+  assert.deepEqual(wx.storage.get('baby_menu_cart_v1'), cart)
+  await page.publishPreview()
+  assert.equal(calls.publishes, 0)
+
+  await page.refreshMenu()
+  assert.deepEqual(calls.releases, ['v-old', 'v-old'])
+  assert.equal(calls.previews, 0)
+  assert.equal(calls.menus, 0)
+})
+
+test('历史版本读取失败可原地重试且不会退回草稿', async () => {
+  const wx = makeWx()
+  let failed = true
+  let previews = 0
+  const api = {
+    getRelease: async (version) => {
+      if (failed) throw Object.assign(new Error('历史版本暂时不可用'), { statusCode: 503 })
+      return { version, document: document() }
+    },
+    getPreview: async () => { previews++; return { revision: 1, document: document() } }
+  }
+  const page = makePage(wx, api, true, { version: 'v-old' })
+  await page.menuRefreshPromise
+  assert.equal(page.data.hasMenu, false)
+  assert.match(page.data.cloudError, /历史版本暂时不可用/)
+  failed = false
+  await page.refreshMenu()
+  assert.equal(page.data.hasMenu, true)
+  assert.equal(page.menuSnapshot.version, 'v-old')
+  assert.equal(previews, 0)
+})
+
+test('没有版本参数时保持草稿预览与发布行为', async () => {
+  const wx = makeWx()
+  const calls = { previews: 0, releases: 0, publishes: 0 }
+  const api = {
+    getPreview: async () => { calls.previews++; return { revision: 3, document: document() } },
+    getRelease: async () => { calls.releases++; return { version: 'unexpected', document: document() } },
+    getMenu: async () => ({ version: 'current', document: document() }),
+    publish: async () => { calls.publishes++ }
+  }
+  const page = makePage(wx, api, true)
+  await page.menuRefreshPromise
+  assert.equal(page.data.historyPreview, false)
+  assert.match(page.data.previewIdentityText, /草稿预览/)
+  assert.equal(calls.previews, 1)
+  assert.equal(calls.releases, 0)
+  await page.publishPreview()
+  assert.equal(calls.publishes, 1)
 })
 
 test('发布超时重试复用请求编号，修订冲突提示重新预览', async () => {
@@ -270,6 +354,12 @@ test('店名只绑定长按管理入口，首页不再显示管理按钮', () =>
   const markup = fs.readFileSync(path.resolve(__dirname, '../miniprogram/pages/menu/menu.wxml'), 'utf8')
   assert.match(markup, /class="shop-name" bindlongpress="openMenuAdmin"/)
   assert.doesNotMatch(markup, /bindtap="openMenuAdmin"|>菜单管理<|bindtap="[^"]*"[^>]*class="shop-name"/)
+})
+
+test('历史预览显示只读身份且不渲染发布控件', () => {
+  const markup = fs.readFileSync(path.resolve(__dirname, '../miniprogram/pages/menu/menu.wxml'), 'utf8')
+  assert.match(markup, /\{\{previewIdentityText\}\}/)
+  assert.match(markup, /previewMode && !historyPreview && hasMenu/)
 })
 
 test('长按入口仅明确授权时进入管理，异常权限与网络失败保持静默', async () => {

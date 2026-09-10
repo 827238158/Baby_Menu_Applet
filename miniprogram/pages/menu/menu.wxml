@@ -1,8 +1,8 @@
 <view class="page" style="{{pageStyle}}">
-  <view wx:if="{{previewMode}}" class="preview-identity">草稿预览 · 不影响真实购物车</view>
+  <view wx:if="{{previewMode}}" class="preview-identity {{historyPreview ? 'preview-identity-history' : ''}}">{{previewIdentityText}}</view>
   <view wx:if="{{cloudLoading}}" class="cloud-notice">正在读取菜单…</view>
   <view wx:if="{{cloudError}}" class="cloud-notice" bindtap="refreshMenu">{{cloudError}} · 点击重试</view>
-  <view wx:if="{{previewMode && hasMenu}}" class="preview-publish">
+  <view wx:if="{{previewMode && !historyPreview && hasMenu}}" class="preview-publish">
     <text>{{previewSummary}}</text>
     <button bindtap="publishPreview" loading="{{publishing}}" disabled="{{publishing || cloudLoading}}">发布此菜单</button>
   </view>

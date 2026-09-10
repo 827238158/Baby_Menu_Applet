@@ -3,6 +3,7 @@
     "pages/menu/menu",
     "pages/gifts/gifts",
     "pages/menu-admin/menu-admin",
+    "pages/menu-dish-editor/menu-dish-editor",
     "pages/menu-preview/menu-preview"
   ],
   "window": {

@@ -1433,4 +1433,5 @@ button::after {
   }
 }
 .preview-identity { color: #827974; font-size: 22rpx; margin-bottom: 16rpx; }
+.preview-identity-history { align-self: flex-start; box-sizing: border-box; padding: 8rpx 16rpx; border: 1rpx solid rgba(165, 95, 122, 0.18); border-radius: 999rpx; color: #8f536b; background: rgba(255, 247, 250, 0.92); }
 .header-image-failed { position: absolute; right: 16rpx; bottom: 10rpx; font-size: 20rpx; color: rgba(255,255,255,.75); }

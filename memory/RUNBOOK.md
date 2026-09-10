@@ -56,7 +56,9 @@ node --check miniprogram/services/menu-images.js
 node --check miniprogram/services/menu-document.js
 node --check miniprogram/services/menu-cloud-page.js
 node --check miniprogram/services/menu-page.js
+node --check miniprogram/services/menu-admin-validation.js
 node --check miniprogram/pages/menu-admin/menu-admin.js
+node --check miniprogram/pages/menu-dish-editor/menu-dish-editor.js
 node --check miniprogram/pages/menu-preview/menu-preview.js
 ```
 
@@ -110,7 +112,7 @@ node --check miniprogram/pages/menu-preview/menu-preview.js
 2. 导入仓库根目录，也就是包含 `project.config.json` 的目录。
 3. 使用 `project.config.json` 中已经配置的小程序 AppID。
 4. 编译后进入 `pages/menu/menu`；需要新版云端接口及已初始化菜单。无缓存而未部署时显示重试，不加载旧数据。
-5. 新增页面后清缓存并编译；三页静态资源/事件检查已纳入 minitest。
+5. 新增页面后清缓存并编译；菜单公开页、管理页、菜品编辑页和预览页的静态资源/事件检查已纳入 minitest。
 
 ## 手动验收
 

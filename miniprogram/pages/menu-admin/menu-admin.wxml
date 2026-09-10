@@ -1,75 +1,101 @@
 <page-meta page-style="{{headerDragging ? 'overflow: hidden;' : ''}}" />
 <view class="page">
-  <view class="heading-row"><view class="heading">菜单管理</view><view class="subtitle">两人共享草稿 · 预览发布后公开更新</view></view>
   <view wx:if="{{loading}}" class="panel muted">正在验证管理权限…</view>
-  <view wx:elif="{{!ready}}" class="panel">
+  <view wx:elif="{{!ready}}" class="panel access-panel">
     <text>{{denied ? '仅限两位受邀用户管理菜单' : error}}</text>
     <button wx:if="{{!denied}}" bindtap="onLoad">重试连接</button>
     <button bindtap="back">返回菜单</button>
   </view>
   <block wx:else>
-    <view class="tabs"><view class="tab-indicator" style="transform: translateX({{tabIndex * 100}}%);"></view><button wx:for="{{tabs}}" wx:key="id" class="tab {{tab === item.id ? 'selected' : ''}}" data-tab="{{item.id}}" bindtap="switchTab" disabled="{{(busy && !historyLoading) || moving}}">{{item.name}}</button></view>
-    <view wx:if="{{error}}" class="notice">{{error}}<button wx:if="{{conflict}}" bindtap="reload" disabled="{{busy || moving}}">重新加载最新草稿</button></view>
+    <view class="status-row status-{{statusKind}}">
+      <view class="status-copy"><view class="status-dot"></view><text>{{statusText}}</text></view>
+      <view class="more-button" aria-role="button" aria-label="更多管理操作" bindtap="openMore">•••</view>
+    </view>
+    <view class="tabs">
+      <view class="tab-indicator" style="transform: translateX({{tabIndex * 100}}%);"></view>
+      <button wx:for="{{tabs}}" wx:key="id" class="tab {{tab === item.id ? 'selected' : ''}}" data-tab="{{item.id}}" bindtap="switchTab" disabled="{{busy || moving}}">{{item.name}}</button>
+    </view>
+    <view wx:if="{{error}}" class="notice"><text>{{error}}</text><button wx:if="{{conflict}}" bindtap="reload" disabled="{{busy || moving}}">重新加载最新草稿</button></view>
+
     <block wx:if="{{tab === 'dishes'}}">
-      <view wx:if="{{!document.dishes.length}}" class="panel muted">还没有菜品，请先创建分类，再添加菜品。</view>
-      <view wx:for="{{document.dishes}}" wx:key="id" id="dish-row-{{index}}" class="panel dish-card {{moving ? 'moving' : ''}}" style="{{moveStyles[item.id] || ''}}">
-        <!-- 摘要与编辑入口分离，展开后仍从右上角关闭。 -->
-        <view class="row dish-summary">
+      <view class="section-toolbar">
+        <view class="section-inline-title"><text class="section-heading">菜品</text><text class="section-count">{{document.dishes.length}} 道</text></view>
+        <view class="toolbar-actions"><button class="quiet-button" bindtap="toggleSortMode" disabled="{{busy || moving || document.dishes.length < 2}}">{{sortMode ? '完成排序' : '调整顺序'}}</button><button class="add-button" bindtap="addDish" disabled="{{busy || moving}}">＋ 新增</button></view>
+      </view>
+      <view wx:if="{{!sortMode}}" class="filter-panel">
+        <input class="search-input" value="{{searchQuery}}" bindinput="changeSearch" placeholder="搜索菜名、简介或标签" confirm-type="search" />
+        <picker class="category-filter" range="{{categoryFilters}}" range-key="name" value="{{categoryFilterIndex}}" bindchange="changeCategoryFilter"><view class="filter-value"><text>{{categoryFilters[categoryFilterIndex].name}}</text><view class="chevron"></view></view></picker>
+      </view>
+      <view wx:if="{{sortMode}}" class="sort-hint">正在调整全部菜品顺序，完成后记得保存草稿。</view>
+      <view wx:if="{{!visibleDishes.length}}" class="panel empty-state">{{document.dishes.length ? '没有符合条件的菜品' : '还没有菜品，请先创建分类，再添加菜品。'}}</view>
+      <view wx:for="{{visibleDishes}}" wx:key="id" id="dish-row-{{index}}" class="panel dish-card {{moving ? 'moving' : ''}}" style="{{moveStyles[item.id] || ''}}" data-id="{{item.id}}" bindtap="openDish">
+        <view class="dish-summary">
           <image wx:if="{{images[item.imageAssetId]}}" class="thumb" data-asset="{{item.imageAssetId}}" binderror="imageError" src="{{images[item.imageAssetId]}}" mode="aspectFill" />
           <view wx:else class="thumb thumb-placeholder">暂无图片</view>
-          <view class="grow"><view class="title dish-name">{{item.name || '未命名菜品'}}</view><view class="dish-status {{item.enabled === false ? 'offline' : ''}}">{{item.enabled === false ? '已下架' : '展示中'}}</view><view class="muted dish-description">{{item.desc || '暂无简介'}}</view></view>
-          <button class="edit-toggle {{activeDish === index ? 'is-open' : ''}}" data-index="{{index}}" bindtap="editDish" disabled="{{busy || moving}}">{{activeDish === index ? '关闭' : '编辑'}}</button>
+          <view class="dish-copy">
+            <view class="dish-title-row"><view class="title dish-name">{{item.name || '未命名菜品'}}</view><view wx:if="{{item.enabled === false}}" class="visibility-badge">菜单中隐藏</view></view>
+            <view class="dish-meta">{{item.categoryName || '未分类'}}</view>
+            <view class="muted dish-description">{{item.desc || '暂无简介'}}</view>
+          </view>
+          <view wx:if="{{!sortMode}}" class="chevron card-chevron"></view>
         </view>
-        <view class="actions"><button data-kind="dishes" data-index="{{index}}" data-delta="-1" bindtap="moveRow" disabled="{{busy || moving || index === 0}}">上移</button><button data-kind="dishes" data-index="{{index}}" data-delta="1" bindtap="moveRow" disabled="{{busy || moving || index === document.dishes.length - 1}}">下移</button><button class="danger" data-kind="dishes" data-index="{{index}}" bindtap="removeRow" disabled="{{busy || moving}}">删除</button></view>
-        <view wx:if="{{activeDish === index}}" class="editor">
-          <view class="editor-section">
-          <view class="section-title">基本信息</view>
-          <view class="label">菜名</view><input value="{{item.name}}" data-id="{{item.id}}" data-path="document.dishes[{{index}}].name" bindinput="changeField" disabled="{{busy || moving}}" maxlength="80" placeholder="输入菜品名称" />
-          <view class="label">简介</view><textarea value="{{item.desc}}" data-id="{{item.id}}" data-path="document.dishes[{{index}}].desc" bindinput="changeField" disabled="{{busy || moving}}" maxlength="2000" auto-height placeholder="食材、口味或准备方式" />
-          <view class="label">分类</view><picker range="{{categoryNames}}" value="{{categoryIndex}}" data-id="{{item.id}}" bindchange="chooseCategory" disabled="{{busy || moving}}"><view class="input picker-value"><text>{{categoryNames[categoryIndex]}}</text><text class="muted">›</text></view></picker>
-          <view class="label">标签<text class="label-hint">用逗号分隔</text></view><input value="{{item.tags}}" data-id="{{item.id}}" bindblur="changeTags" disabled="{{busy || moving}}" maxlength="300" placeholder="清爽，夏季" />
-          <view class="row label"><text class="grow">公开展示</text><switch checked="{{item.enabled !== false}}" color="#d97a8a" data-id="{{item.id}}" data-path="document.dishes[{{index}}].enabled" bindchange="changeField" disabled="{{busy || moving}}" /></view>
-          </view>
-          <view class="editor-section">
-            <view class="section-title">菜品图片</view>
-            <view class="dish-image-field {{busy || moving ? 'is-disabled' : ''}}">
-              <button class="image-picker" data-id="{{item.id}}" data-path="document.dishes[{{index}}].imageAssetId" bindtap="chooseImage" disabled="{{busy || moving}}" aria-label="{{item.imageAssetId ? '更换菜品图片' : '添加菜品图片'}}">
-                <image wx:if="{{images[item.imageAssetId]}}" class="editor-image" data-asset="{{item.imageAssetId}}" binderror="imageError" src="{{images[item.imageAssetId]}}" mode="aspectFill" />
-                <view wx:else class="image-empty"><text class="image-add">＋</text><text>拍照或选择图片</text></view>
-                <view wx:if="{{images[item.imageAssetId]}}" class="image-caption">点击更换图片</view>
-              </button>
-              <!-- 使用固定方形 view 绘制移除控件，避免原生按钮在真机变形。 -->
-              <view wx:if="{{item.imageAssetId}}" class="image-remove" aria-role="button" aria-label="移除菜品图片" aria-disabled="{{busy || moving}}" data-id="{{item.id}}" data-path="document.dishes[{{index}}].imageAssetId" catchtap="removeImage"><view class="cross-line"></view><view class="cross-line cross-line-alt"></view></view>
-            </view>
-          </view>
-          <view class="editor-section">
-          <view class="section-title">规格与备注</view>
-          <view wx:if="{{!item.options.length}}" class="muted section-hint">按需添加口味选择或文字备注。</view>
-          <view wx:for="{{item.options}}" wx:for-item="option" wx:for-index="optionIndex" wx:key="id" class="option">
-            <view class="row option-heading"><text class="grow option-type">{{option.type === 'text' ? '文字备注' : '单项选择'}}</text><button class="text-action danger" data-index="{{optionIndex}}" bindtap="removeOption" disabled="{{busy || moving}}">删除</button></view>
-            <view class="label">{{option.type === 'text' ? '备注名称' : '规格名称'}}</view>
-            <input value="{{option.name}}" placeholder="规格名称，如辣度" data-id="{{item.id}}" data-path="document.dishes[{{index}}].options[{{optionIndex}}].name" bindinput="changeField" disabled="{{busy || moving}}" maxlength="80" />
-            <view class="row label"><text class="grow">必填</text><switch checked="{{option.required}}" data-id="{{item.id}}" data-path="document.dishes[{{index}}].options[{{optionIndex}}].required" bindchange="changeField" color="#d97a8a" disabled="{{busy || moving}}" /></view>
-            <block wx:if="{{option.type === 'text'}}"><view class="label">填写提示</view><input value="{{option.placeholder}}" placeholder="例如：少盐、不放香菜" data-id="{{item.id}}" data-path="document.dishes[{{index}}].options[{{optionIndex}}].placeholder" bindinput="changeField" disabled="{{busy || moving}}" /><view class="label">最多填写字数</view><input type="number" value="{{option.maxlength}}" data-id="{{item.id}}" data-path="document.dishes[{{index}}].options[{{optionIndex}}].maxlength" bindinput="changeField" disabled="{{busy || moving}}" /></block>
-            <block wx:else><view class="label">可选项</view><view wx:for="{{option.choices}}" wx:for-item="choice" wx:for-index="choiceIndex" wx:key="id" class="row choice-row"><input class="grow" value="{{choice.name}}" placeholder="选项名称，如微辣" data-id="{{item.id}}" data-path="document.dishes[{{index}}].options[{{optionIndex}}].choices[{{choiceIndex}}].name" bindinput="changeField" disabled="{{busy || moving}}" maxlength="80" /><button class="text-action danger" data-option="{{optionIndex}}" data-choice="{{choiceIndex}}" bindtap="removeChoice" disabled="{{busy || moving}}">移除</button></view><button class="add-choice" data-index="{{optionIndex}}" bindtap="addChoice" disabled="{{busy || moving}}">＋ 添加选项</button></block>
-          </view>
-          <view class="actions option-actions"><button data-type="choice" bindtap="addOption" disabled="{{busy || moving}}">＋ 选择规格</button><button data-type="text" bindtap="addOption" disabled="{{busy || moving}}">＋ 文字备注</button></view>
-          </view>
+        <view wx:if="{{sortMode}}" class="sort-actions" catchtap="stopTap"><text class="position-label">第 {{index + 1}} 位</text><button data-kind="dishes" data-index="{{index}}" data-delta="-1" bindtap="moveRow" disabled="{{busy || moving || index === 0}}">上移</button><button data-kind="dishes" data-index="{{index}}" data-delta="1" bindtap="moveRow" disabled="{{busy || moving || index === visibleDishes.length - 1}}">下移</button></view>
+      </view>
+    </block>
+
+    <block wx:elif="{{tab === 'categories'}}">
+      <view class="section-toolbar">
+        <view class="section-inline-title"><text class="section-heading">分类</text><text class="section-count">{{document.categories.length}} 个</text></view>
+        <view class="toolbar-actions"><button class="quiet-button" bindtap="toggleSortMode" disabled="{{busy || moving || document.categories.length < 2}}">{{sortMode ? '完成排序' : '调整顺序'}}</button><button class="add-button" bindtap="addCategory" disabled="{{busy || moving}}">＋ 新增</button></view>
+      </view>
+      <view wx:if="{{sortMode}}" class="sort-hint">正在调整分类顺序，完成后记得保存草稿。</view>
+      <view wx:if="{{!categoryViews.length}}" class="panel empty-state">还没有分类，请先新增分类。</view>
+      <view wx:for="{{categoryViews}}" wx:key="id" id="category-row-{{index}}" class="panel category-card {{invalidField === item.id ? 'is-invalid' : ''}}">
+        <view class="category-summary" data-id="{{item.id}}" bindtap="toggleCategory"><view class="category-copy"><view class="title">{{item.name || '未命名分类'}}</view><view class="muted">{{item.dishCount}} 道菜品</view></view><view wx:if="{{!sortMode}}" class="chevron {{expandedCategoryId === item.id ? 'is-open' : ''}}"></view></view>
+        <view wx:if="{{sortMode}}" class="sort-actions"><text class="position-label">第 {{index + 1}} 位</text><button data-kind="categories" data-index="{{index}}" data-delta="-1" bindtap="moveRow" disabled="{{busy || moving || index === 0}}">上移</button><button data-kind="categories" data-index="{{index}}" data-delta="1" bindtap="moveRow" disabled="{{busy || moving || index === categoryViews.length - 1}}">下移</button></view>
+        <view wx:if="{{!sortMode && expandedCategoryId === item.id}}" class="category-editor">
+          <view class="label">分类名称</view><input value="{{item.name}}" placeholder="输入分类名称" data-id="{{item.id}}" bindinput="changeCategoryName" maxlength="80" focus="{{newCategoryId === item.id}}" disabled="{{busy || moving}}" />
+          <view wx:if="{{invalidField === item.id}}" class="field-error">请填写分类名称</view>
+          <button class="danger-action" data-kind="categories" data-index="{{index}}" bindtap="removeRow" disabled="{{busy || moving}}">删除分类</button>
         </view>
       </view>
     </block>
-    <block wx:elif="{{tab === 'categories'}}">
-      <view wx:for="{{document.categories}}" wx:key="id" id="category-row-{{index}}" class="panel"><input value="{{item.name}}" placeholder="分类名称" data-path="document.categories[{{index}}].name" bindinput="changeField" disabled="{{busy || moving}}" maxlength="80" /><view class="actions"><button data-kind="categories" data-index="{{index}}" data-delta="-1" bindtap="moveRow" disabled="{{busy || moving || index === 0}}">上移</button><button data-kind="categories" data-index="{{index}}" data-delta="1" bindtap="moveRow" disabled="{{busy || moving || index === document.categories.length - 1}}">下移</button><button class="danger" data-kind="categories" data-index="{{index}}" bindtap="removeRow" disabled="{{busy || moving}}">删除</button></view></view>
-    </block>
-    <view wx:elif="{{tab === 'shop'}}" class="panel">
-      <block wx:for="{{shopFields}}" wx:key="key"><view class="label">{{item.name}}</view><input value="{{document.shop[item.key]}}" data-path="document.shop.{{item.key}}" bindinput="changeField" disabled="{{busy || moving}}" maxlength="200" /></block>
-      <view wx:for="{{shopImages}}" wx:key="key" class="image-setting"><view class="label">{{item.name}}</view><view wx:if="{{item.key === 'headerBackgroundImage'}}" id="header-preview" class="header-preview {{headerDragging ? 'is-dragging' : ''}}" bindlongpress="headerLongPress" catchtouchmove="{{headerDragging ? 'headerTouchMove' : ''}}" bindtouchend="headerTouchEnd" bindtouchcancel="headerTouchCancel"><image wx:if="{{images[document.shop[item.key]]}}" class="header-preview-image" style="{{headerStyle}}" data-asset="{{document.shop[item.key]}}" src="{{images[document.shop[item.key]]}}" data-src="{{images[document.shop[item.key]]}}" bindload="headerLoad" binderror="imageError" mode="scaleToFill" /><view class="header-preview-copy"><view class="header-preview-title">{{document.shop.name}}</view><view>{{document.shop.subtitle}}</view></view><view class="header-preview-gift">♡ 心愿夹</view><view class="header-drag-hint">{{headerDragging ? '拖动调整 · 松手保留' : (headerLoaded ? '长按图片拖动调整位置' : '等待图片加载')}}</view></view><image wx:elif="{{images[document.shop[item.key]]}}" class="wide-image" data-asset="{{document.shop[item.key]}}" binderror="imageError" src="{{images[document.shop[item.key]]}}" mode="aspectFill" /><view class="actions"><button data-path="document.shop.{{item.key}}" bindtap="chooseImage" disabled="{{busy || moving}}">{{document.shop[item.key] ? '更换图片' : '拍照或选择图片'}}</button><button wx:if="{{document.shop[item.key]}}" data-path="document.shop.{{item.key}}" bindtap="removeImage" disabled="{{busy || moving}}">移除图片</button></view></view>
+
+    <view wx:elif="{{tab === 'shop'}}" class="settings-list">
+      <view class="panel settings-section {{invalidField === 'shop.name' ? 'is-invalid' : ''}}">
+        <view class="section-heading">首页内容</view><view class="section-caption">设置公开菜单顶部展示的文字。</view>
+        <view class="label">店名</view><input value="{{document.shop.name}}" data-path="document.shop.name" bindinput="changeField" maxlength="200" placeholder="输入店名" disabled="{{busy}}" />
+        <view wx:if="{{invalidField === 'shop.name'}}" class="field-error">请填写店名</view>
+        <view class="label">副标题</view><input value="{{document.shop.subtitle}}" data-path="document.shop.subtitle" bindinput="changeField" maxlength="200" placeholder="输入副标题" disabled="{{busy}}" />
+      </view>
+      <view class="panel settings-section">
+        <view class="section-heading">首页外观</view><view class="section-caption">设置头图和页面背景。</view>
+        <view class="image-setting">
+          <view class="setting-title-row"><view class="label compact-label">头图</view><button wx:if="{{document.shop.headerBackgroundImage}}" class="text-button" bindtap="toggleHeaderAdjust" disabled="{{busy || !headerLoaded}}">{{headerAdjusting ? '完成调整' : '调整位置'}}</button></view>
+          <view id="header-preview" class="header-preview {{headerAdjusting ? 'is-adjusting' : ''}}" bindtouchstart="headerTouchStart" catchtouchmove="{{headerAdjusting ? 'headerTouchMove' : ''}}" bindtouchend="headerTouchEnd" bindtouchcancel="headerTouchCancel">
+            <image wx:if="{{images[document.shop.headerBackgroundImage]}}" class="header-preview-image" style="{{headerStyle}}" data-asset="{{document.shop.headerBackgroundImage}}" src="{{images[document.shop.headerBackgroundImage]}}" data-src="{{images[document.shop.headerBackgroundImage]}}" bindload="headerLoad" binderror="imageError" mode="scaleToFill" />
+            <view wx:else class="header-empty">拍照或选择一张头图</view>
+            <view wx:if="{{images[document.shop.headerBackgroundImage]}}" class="header-preview-copy"><view class="header-preview-title">{{document.shop.name}}</view><view>{{document.shop.subtitle}}</view></view><view wx:if="{{images[document.shop.headerBackgroundImage]}}" class="header-preview-gift">♡ 心愿夹</view><view wx:if="{{headerAdjusting}}" class="header-drag-hint">按住图片拖动调整 · 完成后恢复滚动</view>
+          </view>
+          <view class="image-actions"><button data-path="document.shop.headerBackgroundImage" bindtap="chooseImage" disabled="{{busy}}">{{document.shop.headerBackgroundImage ? '更换图片' : '拍照或选择图片'}}</button><button wx:if="{{document.shop.headerBackgroundImage}}" class="text-button danger" data-path="document.shop.headerBackgroundImage" bindtap="removeImage" disabled="{{busy}}">移除</button></view>
+        </view>
+        <view class="image-setting"><view class="label">页面背景</view><image wx:if="{{images[document.shop.pageBackgroundImage]}}" class="wide-image" data-asset="{{document.shop.pageBackgroundImage}}" binderror="imageError" src="{{images[document.shop.pageBackgroundImage]}}" mode="aspectFill" /><view class="image-actions"><button data-path="document.shop.pageBackgroundImage" bindtap="chooseImage" disabled="{{busy}}">{{document.shop.pageBackgroundImage ? '更换图片' : '拍照或选择图片'}}</button><button wx:if="{{document.shop.pageBackgroundImage}}" class="text-button danger" data-path="document.shop.pageBackgroundImage" bindtap="removeImage" disabled="{{busy}}">移除</button></view></view>
+      </view>
+      <view class="panel settings-section">
+        <view class="section-heading">分享卡片</view><view class="section-caption">设置微信转发时使用的标题和图片。</view>
+        <view class="label">分享标题</view><input value="{{document.shop.shareTitle}}" data-path="document.shop.shareTitle" bindinput="changeField" maxlength="200" placeholder="输入分享标题" disabled="{{busy}}" />
+        <view class="image-setting"><view class="label">分享图片</view><image wx:if="{{images[document.shop.shareImage]}}" class="wide-image" data-asset="{{document.shop.shareImage}}" binderror="imageError" src="{{images[document.shop.shareImage]}}" mode="aspectFill" /><view class="image-actions"><button data-path="document.shop.shareImage" bindtap="chooseImage" disabled="{{busy}}">{{document.shop.shareImage ? '更换图片' : '拍照或选择图片'}}</button><button wx:if="{{document.shop.shareImage}}" class="text-button danger" data-path="document.shop.shareImage" bindtap="removeImage" disabled="{{busy}}">移除</button></view></view>
+      </view>
     </view>
+
     <block wx:else>
-      <view wx:if="{{historyLoaded && !history.length}}" class="panel muted">还没有发布记录。</view>
-      <view wx:for="{{history}}" wx:key="version" class="panel"><view class="title">{{item.publishedLabel}}</view><view class="muted version">{{item.version}}</view><view>{{item.summaryLabel}}</view><view class="actions"><button data-version="{{item.version}}" bindtap="viewHistory" disabled="{{busy || moving}}">查看内容</button><button data-version="{{item.version}}" bindtap="restoreHistory" disabled="{{busy || moving}}">恢复到草稿</button></view></view>
-      <button wx:if="{{nextCursor}}" bindtap="loadHistory" disabled="{{busy || moving}}">加载更多历史</button>
+      <view class="section-toolbar"><view><view class="section-heading">发布历史</view><view class="section-caption">恢复后仍需重新预览并发布。</view></view></view>
+      <view wx:if="{{historyLoading && !history.length}}" class="history-skeleton"><view></view><view></view></view>
+      <view wx:elif="{{historyLoaded && !history.length}}" class="panel empty-state">还没有发布记录。</view>
+      <view wx:for="{{history}}" wx:key="version" class="panel history-card"><view class="history-date">{{item.publishedLabel}}</view><view class="history-summary">{{item.summaryLabel}}</view><view class="history-actions"><button data-version="{{item.version}}" bindtap="viewHistory" disabled="{{busy}}">预览此版本</button><button class="text-button" data-version="{{item.version}}" bindtap="restoreHistory" loading="{{restoringVersion === item.version}}" disabled="{{busy}}">恢复到草稿</button></view></view>
+      <button wx:if="{{nextCursor}}" class="load-more" bindtap="loadHistory" loading="{{historyLoading}}" disabled="{{busy}}">加载更多</button>
     </block>
-    <view class="footer"><button wx:if="{{tab === 'dishes'}}" bindtap="addDish" disabled="{{busy || moving}}">新增菜品</button><button wx:elif="{{tab === 'categories'}}" bindtap="addCategory" disabled="{{busy || moving}}">新增分类</button><button bindtap="reload" disabled="{{busy || moving}}">重载</button><button bindtap="saveDraft" disabled="{{busy || moving}}" loading="{{busy}}">保存草稿</button><button class="primary" bindtap="preview" disabled="{{busy || moving}}">预览发布</button></view>
+
+    <view class="footer"><button class="footer-save" bindtap="saveDraft" loading="{{saving}}" disabled="{{busy || moving || !dirty}}">{{saving ? '保存中' : (dirty ? '保存草稿' : '已保存')}}</button><button class="primary" bindtap="preview" disabled="{{busy || moving}}">{{dirty ? '保存并预览' : '预览草稿'}}</button></view>
   </block>
 </view>

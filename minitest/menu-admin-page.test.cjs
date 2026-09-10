@@ -10,8 +10,9 @@ function draft() {
 function create(api = {}, wxOverrides = {}) {
   let definition
   const messages = []
-  const wx = { showToast: (value) => messages.push(value), showModal: (value) => value.success({ confirm: true }), enableAlertBeforeUnload() {}, disableAlertBeforeUnload() {}, navigateTo: (value) => messages.push(value), ...wxOverrides }
-  const context = { setTimeout, clearTimeout, require: (name) => name.endsWith('menu-header') ? require('../miniprogram/services/menu-header') : name.endsWith('menu-document') ? require('../miniprogram/services/menu-document') : ({ access: async () => ({}), getDraft: async () => draft(), ...api }), wx, Page: (value) => { definition = value } }
+  const wx = { showToast: (value) => messages.push(value), showModal: (value) => value.success({ confirm: true }), enableAlertBeforeUnload() {}, disableAlertBeforeUnload() {}, navigateTo: (value) => messages.push(value), showActionSheet: () => {}, ...wxOverrides }
+  const menuApi = { access: async () => ({}), getDraft: async () => draft(), getMenu: async () => ({ version: 'v1', document: draft().document }), getRelease: async () => ({ version: 'v1', document: draft().document }), ...api }
+  const context = { setTimeout, clearTimeout, require: (name) => name.endsWith('menu-header') ? require('../miniprogram/services/menu-header') : name.endsWith('menu-document') ? require('../miniprogram/services/menu-document') : name.endsWith('menu-admin-validation') ? require('../miniprogram/services/menu-admin-validation') : menuApi, wx, Page: (value) => { definition = value } }
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../miniprogram/pages/menu-admin/menu-admin.js'), 'utf8'), context)
   const page = { ...definition, data: JSON.parse(JSON.stringify(definition.data)) }
   page.setData = (updates) => {
@@ -153,7 +154,7 @@ test('invalid text maxlength prevents network save without changing form', async
   assert.equal(await page.saveDraft(), false)
   assert.equal(writes, 0)
   assert.equal(page.data.dirty, true)
-  assert.match(messages.at(-1).title, /整数/)
+  assert.ok(messages.some((item) => item.title && /整数/.test(item.title)))
 })
 
 test('declining reload keeps unsaved changes and unload warning', async () => {
@@ -174,7 +175,7 @@ test('history formats server timestamps and structured summary for display', asy
   const { page } = create({ getHistory: async () => ({ items: [{ version: 'v1', publishedAt: 1700000000000, summary: { categories: 2, dishes: 5, enabledDishes: 4 } }] }) })
   await page.onLoad()
   await page.loadHistory()
-  assert.match(page.data.history[0].summaryLabel, /2 个分类 · 5 道菜品 · 4 道上架/)
+  assert.match(page.data.history[0].summaryLabel, /2 个分类 · 5 道菜品 · 4 道展示/)
   assert.equal(typeof page.data.history[0].publishedLabel, 'string')
 })
 
@@ -194,31 +195,31 @@ test('empty category and last category can be deleted', async () => {
   page.data.document.dishes = []
   await page.removeRow({ currentTarget: { dataset: { kind: 'categories', index: 0 } } })
   assert.equal(page.data.document.categories.length, 0)
-  assert.equal(page.data.categoryNames.length, 0)
-  assert.equal(page.data.activeDish, -1)
+  assert.equal(page.data.categoryViews.length, 0)
+  assert.equal(page.data.categoryFilters.length, 1)
 })
 
-test('editor toggle keeps changes and delayed tags target their original dish', async () => {
-  const { page } = create()
+test('dish editor commit updates by stable id and canceling create leaves no empty row', async () => {
+  let navigation
+  const { page } = create({}, { navigateTo: (options) => { navigation = options } })
   await page.onLoad()
-  page.data.document.dishes.push({ ...page.data.document.dishes[0], id: 'second' })
-  const tap = (index) => ({ currentTarget: { dataset: { index } } })
-  page.editDish(tap(0))
-  page.changeField({ currentTarget: { dataset: { path: 'document.dishes[0].name', id: 'd' } }, detail: { value: '改名' } })
-  page.editDish(tap(0))
-  assert.equal(page.data.activeDish, -1)
+  page.openDish({ currentTarget: { dataset: { id: 'd' } } })
+  assert.equal(navigation.url, '/pages/menu-dish-editor/menu-dish-editor')
+  navigation.events['dishEditor:commit']({ dish: { ...page.data.document.dishes[0], id: 'changed', name: '改名', price: '99' }, assets: {}, images: {} })
+  assert.equal(page.data.document.dishes[0].id, 'd')
   assert.equal(page.data.document.dishes[0].name, '改名')
-  page.editDish(tap(1))
-  page.changeTags({ currentTarget: { dataset: { id: 'd' } }, detail: { value: '清爽，夏季' } })
-  assert.equal(page.data.document.dishes[0].tags.join(','), '清爽,夏季')
-  assert.equal(page.data.document.dishes[1].tags.length, 0)
+  assert.equal(page.data.document.dishes[0].price, '0')
+  const before = page.data.document.dishes.length
+  page.addDish()
+  assert.equal(page.data.document.dishes.length, before)
 })
 
-test('moving unequal expanded cards preserves editor and prevents overlapping mutations', async () => {
+test('sorting unequal cards prevents overlapping mutations and preserves stable data', async () => {
   const { page } = create()
   await page.onLoad()
   page.data.document.dishes.push({ ...page.data.document.dishes[0], id: 'second' })
-  page.data.activeDish = 0
+  page.data.sortMode = true
+  page.refreshViews()
   page.createSelectorQuery = () => {
     const query = { select: () => query, boundingClientRect: () => query, exec: (done) => done([{ top: 0, bottom: 300, height: 300 }, { top: 320, bottom: 420, height: 100 }]) }
     return query
@@ -233,15 +234,13 @@ test('moving unequal expanded cards preserves editor and prevents overlapping mu
   await pending
   assert.equal(page.data.document.dishes.length, 2)
   assert.equal(page.data.document.dishes[1].id, 'd')
-  assert.equal(page.data.activeDish, 1)
   assert.equal(page.data.moving, false)
-  page.changeField({ currentTarget: { dataset: { path: 'document.dishes[0].name', id: 'd' } }, detail: { value: '稳定归属' } })
-  assert.equal(page.data.document.dishes[1].name, '稳定归属')
 })
 
 test('sort boundaries and missing geometry do not block subsequent editing', async () => {
   const { page } = create()
   await page.onLoad()
+  page.data.sortMode = true
   await page.moveRow({ currentTarget: { dataset: { kind: 'dishes', index: 0, delta: -1 } } })
   assert.equal(page.data.dirty, false)
   page.data.document.dishes.push({ ...page.data.document.dishes[0], id: 'second' })
@@ -251,15 +250,15 @@ test('sort boundaries and missing geometry do not block subsequent editing', asy
   assert.equal(page.data.moving, false)
 })
 
-test('tab indicator follows final selection and adding rows scrolls after render', async () => {
+test('tab indicator follows final selection and adding category scrolls after render', async () => {
   const scrolls = []
-  const { page } = create({}, { nextTick: (fn) => fn(), pageScrollTo: (value) => scrolls.push(value.selector) })
+  let navigation
+  const { page } = create({}, { nextTick: (fn) => fn(), pageScrollTo: (value) => scrolls.push(value.selector), navigateTo: (value) => { navigation = value } })
   await page.onLoad()
   for (const tab of ['shop', 'categories', 'dishes']) page.switchTab({ currentTarget: { dataset: { tab } } })
   assert.equal(page.data.tabIndex, 0)
   page.addDish()
-  assert.equal(page.data.activeDish, 1)
-  assert.equal(scrolls.at(-1), '#dish-row-1')
+  assert.equal(navigation.url, '/pages/menu-dish-editor/menu-dish-editor')
   page.addCategory()
   assert.equal(scrolls.at(-1), '#category-row-1')
 })
@@ -278,20 +277,21 @@ test('header drag preserves legacy position until movement and cancel restores c
   page.headerLoad({ currentTarget: { dataset: { asset: 'header' } }, detail: { width: 400, height: 400 } })
   const original = page.data.headerStyle
   const touch = (y) => ({ touches: [{ clientX: 0, clientY: y }] })
-  page.headerLongPress(touch(0))
+  page.toggleHeaderAdjust()
+  page.headerTouchStart(touch(0))
   assert.equal(page.data.headerDragging, true)
   page.headerTouchEnd()
   assert.equal(page.data.headerDragging, false)
   assert.equal(page.data.document.shop.headerBackgroundPosition, 'center 60%')
   assert.equal(page.data.dirty, false)
-  page.headerLongPress(touch(0))
+  page.headerTouchStart(touch(0))
   page.headerTouchMove(touch(60))
   assert.notEqual(page.data.headerStyle, original)
   page.headerTouchCancel()
   assert.equal(page.data.headerDragging, false)
   assert.equal(page.data.headerStyle, original)
   assert.equal(page.data.dirty, false)
-  page.headerLongPress(touch(0))
+  page.headerTouchStart(touch(0))
   page.headerTouchMove(touch(60))
   page.headerTouchEnd()
   assert.equal(page.data.document.shop.headerBackgroundPosition, '50% 36%')
@@ -310,8 +310,85 @@ test('successful save clears native unsaved warning', async () => {
   assert.equal(page.data.dirty, false)
 })
 
-test('header touchmove is caught only while dragging, without blocking ordinary scrolling', () => {
+test('header touchmove is caught only in explicit adjustment mode', () => {
   const source = fs.readFileSync(path.join(__dirname, '../miniprogram/pages/menu-admin/menu-admin.wxml'), 'utf8')
-  assert.ok(source.includes('catchtouchmove="{{headerDragging ? \'headerTouchMove\' : \'\'}}"'))
+  assert.ok(source.includes('catchtouchmove="{{headerAdjusting ? \'headerTouchMove\' : \'\'}}"'))
   assert.ok(!source.includes('bindtouchmove="headerTouchMove"'))
+})
+
+test('admin text inputs are visibly disabled while their events are locked', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../miniprogram/pages/menu-admin/menu-admin.wxml'), 'utf8')
+  assert.match(source, /bindinput="changeCategoryName"[^>]+disabled="\{\{busy \|\| moving\}\}"/)
+  assert.equal((source.match(/bindinput="changeField"[^>]+disabled="\{\{busy\}\}"/g) || []).length, 3)
+})
+
+test('search and category filter derive visible dishes without changing the draft', async () => {
+  const { page } = create()
+  await page.onLoad()
+  page.data.document.categories.push({ id: 'sweet', name: '甜品', order: 1 })
+  page.data.document.dishes.push({ ...page.data.document.dishes[0], id: 'cake', name: '草莓蛋糕', desc: '清甜', categoryId: 'sweet', tags: ['下午茶'] })
+  page.refreshViews()
+  page.changeSearch({ detail: { value: '下午茶' } })
+  assert.equal(page.data.visibleDishes.map((item) => item.id).join(','), 'cake')
+  page.changeSearch({ detail: { value: '' } })
+  page.changeCategoryFilter({ detail: { value: 2 } })
+  assert.equal(page.data.visibleDishes.map((item) => item.id).join(','), 'cake')
+  assert.equal(page.data.dirty, false)
+})
+
+test('draft status distinguishes dirty saved and published while ignoring stale checks', async () => {
+  let resolveCurrent
+  const current = new Promise((resolve) => { resolveCurrent = resolve })
+  const { page } = create({ getMenu: () => current })
+  await page.onLoad()
+  page.markChanged()
+  resolveCurrent({ document: draft().document })
+  await current
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(page.data.statusKind, 'dirty')
+  assert.equal(page.data.statusText, '草稿未同步')
+})
+
+test('published status compares the same public projection when hidden dishes exist', async () => {
+  const value = draft()
+  value.document.dishes.push({ ...value.document.dishes[0], id: 'hidden', name: '隐藏菜', enabled: false })
+  const publicDocument = { ...value.document, dishes: value.document.dishes.filter((dish) => dish.enabled !== false) }
+  const { page } = create({ getDraft: async () => value, getMenu: async () => ({ version: 'v-hidden', document: publicDocument }), getRelease: async () => ({ version: 'v-hidden', document: value.document }) })
+  await page.onLoad()
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(page.data.statusKind, 'published')
+  assert.equal(page.data.statusText, '当前已是最新版本')
+})
+
+test('saved hidden-dish edits remain pending until their full snapshot is published', async () => {
+  const current = draft()
+  current.document.dishes.push({ ...current.document.dishes[0], id: 'hidden', name: '旧隐藏菜', enabled: false })
+  const saved = JSON.parse(JSON.stringify(current))
+  saved.document.dishes[1].name = '修改后的隐藏菜'
+  const { page } = create({
+    getDraft: async () => saved,
+    getMenu: async () => ({ version: 'v-old', document: { ...current.document, dishes: current.document.dishes.filter((dish) => dish.enabled !== false) } }),
+    getRelease: async () => ({ version: 'v-old', document: current.document })
+  })
+  await page.onLoad()
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(page.data.statusKind, 'saved')
+  assert.equal(page.data.statusText, '草稿已保存，待发布')
+})
+
+test('history detail navigates to a version-locked visual preview', async () => {
+  const { page, messages } = create()
+  await page.onLoad()
+  page.viewHistory({ currentTarget: { dataset: { version: 'v 1' } } })
+  assert.equal(messages.at(-1).url, '/pages/menu-preview/menu-preview?version=v%201')
+})
+
+test('dish tools stay compact and visible dishes do not repeat a status badge', () => {
+  const wxml = fs.readFileSync(path.join(__dirname, '../miniprogram/pages/menu-admin/menu-admin.wxml'), 'utf8')
+  const wxss = fs.readFileSync(path.join(__dirname, '../miniprogram/pages/menu-admin/menu-admin.wxss'), 'utf8')
+  assert.ok(wxml.includes('class="section-inline-title"'))
+  assert.ok(wxss.includes('.section-inline-title'))
+  assert.ok(wxss.includes('white-space: nowrap'))
+  assert.ok(wxml.includes('wx:if="{{item.enabled === false}}" class="visibility-badge">菜单中隐藏'))
+  assert.ok(!wxml.includes('发布后展示'))
 })

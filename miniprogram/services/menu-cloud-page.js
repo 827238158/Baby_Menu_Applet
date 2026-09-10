@@ -24,9 +24,18 @@ function attachCloudMenu(page, options, helpers, wx) {
   const basePersist = page.persistSelectedItems
   const baseGetStored = page.getStoredSelectedItems
   Object.assign(page.data, { headerAssetId: '', headerImageStyle: 'width:100%;height:100%;', headerImageFailed: false })
-  Object.assign(page.data, { previewMode: preview, cloudLoading: !options.initialMenu, cloudError: '', cloudStatus: '', hasMenu: Boolean(options.initialMenu), publishing: false, previewSummary: '' })
+  Object.assign(page.data, { previewMode: preview, historyPreview: false, previewIdentityText: '草稿预览 · 不影响真实购物车', cloudLoading: !options.initialMenu, cloudError: '', cloudStatus: '', hasMenu: Boolean(options.initialMenu), publishing: false, previewSummary: '' })
   Object.assign(page, {
-    onLoad() {
+    onLoad(query = {}) {
+      // 历史版本只从页面参数读取一次，后续刷新始终锁定同一份私有快照。
+      const pageQuery = query && typeof query === 'object' ? query : {}
+      this.historyVersion = preview && typeof pageQuery.version === 'string' ? pageQuery.version.trim() : ''
+      const historyPreview = Boolean(this.historyVersion)
+      this.setData({
+        historyPreview,
+        previewIdentityText: historyPreview ? '历史版本预览 · 只读' : '草稿预览 · 不影响真实购物车'
+      })
+      if (historyPreview && wx.setNavigationBarTitle) wx.setNavigationBarTitle({ title: '历史版本预览' })
       this.menuImageService = createMenuImages(wx, api)
       this.menuImageUrls = {}
       this.menuImageFailures = new Set()
@@ -38,7 +47,7 @@ function attachCloudMenu(page, options, helpers, wx) {
       this.quantityMotionSequence = 0
       this.cartCloseTimer = null
       this.detailCloseTimer = null
-      if (options.initialMenu) { baseLoad.call(this); return }
+      if (options.initialMenu) { baseLoad.call(this, pageQuery); return }
       if (preview) {
         if (wx.hideShareMenu) wx.hideShareMenu()
       } else {
@@ -131,18 +140,24 @@ function attachCloudMenu(page, options, helpers, wx) {
       this.setData({ cloudLoading: !this.data.hasMenu, cloudError: '' })
       this.menuRefreshPromise = (async () => {
         try {
-          const snapshot = preview ? await api.getPreview() : await api.getMenu(this.menuSnapshot && this.menuSnapshot.version)
+          const historyPreview = preview && Boolean(this.historyVersion)
+          const snapshot = historyPreview
+            ? await api.getRelease(this.historyVersion)
+            : preview ? await api.getPreview() : await api.getMenu(this.menuSnapshot && this.menuSnapshot.version)
           if (this.menuDisposed) return
           if (!snapshot.unchanged) {
             validateDocument(snapshot.document)
-            if (!this.menuSnapshot || (preview ? this.menuSnapshot.revision !== snapshot.revision : this.menuSnapshot.version !== snapshot.version)) this.applyCloudMenu(snapshot)
+            const snapshotChanged = !this.menuSnapshot || (historyPreview
+              ? this.menuSnapshot.version !== snapshot.version
+              : preview ? this.menuSnapshot.revision !== snapshot.revision : this.menuSnapshot.version !== snapshot.version)
+            if (snapshotChanged) this.applyCloudMenu(snapshot)
             if (!preview) {
               try { wx.setStorageSync(CACHE_KEY, { version: snapshot.version, document: snapshot.document }) } catch (error) {}
             }
           } else if (!this.menuSnapshot) throw new Error('菜单缓存不可用，请重试')
-          this.setData({ cloudStatus: preview ? '草稿预览 · 加购不会影响真实购物车' : '', cloudError: '' })
+          this.setData({ cloudStatus: historyPreview ? '历史版本只读预览 · 加购不会影响真实购物车' : preview ? '草稿预览 · 加购不会影响真实购物车' : '', cloudError: '' })
           await this.loadCloudImages()
-          if (preview && !this.menuDisposed) {
+          if (preview && !historyPreview && !this.menuDisposed) {
             const current = await api.getMenu().catch((error) => {
               if (error.statusCode === 404) return { document: null }
               throw error
@@ -247,7 +262,7 @@ function attachCloudMenu(page, options, helpers, wx) {
       }
     },
     async publishPreview() {
-      if (!preview || !this.menuSnapshot || this.data.publishing || this.data.cloudLoading) return
+      if (!preview || this.historyVersion || !this.menuSnapshot || this.data.publishing || this.data.cloudLoading) return
       const revision = this.menuSnapshot.revision
       const confirmed = await new Promise((resolve) => wx.showModal({ title: '发布菜单', content: (this.data.previewSummary || '') + '\n发布后所有用户可查看此版本。', success: (result) => resolve(result.confirm), fail: () => resolve(false) }))
       if (!confirmed) return

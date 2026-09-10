@@ -1,4 +1,4 @@
 const { createMenuPage } = require('../../services/menu-page')
 
-// 预览与公开菜单使用同一交互实现，但隔离真实购物车和分享入口。
+// 草稿与历史版本共用公开菜单交互；查询参数由云端页面适配层判定只读模式。
 Page(createMenuPage({ preview: true }))

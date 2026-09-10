@@ -16,9 +16,9 @@ function loadDefinition(relative) {
   return page
 }
 
-test('菜单三页已注册且资源完整，预览引用唯一公开模板和样式', () => {
+test('菜单四页已注册且资源完整，预览引用唯一公开模板和样式', () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'))
-  for (const route of ['pages/menu/menu', 'pages/menu-admin/menu-admin', 'pages/menu-preview/menu-preview']) {
+  for (const route of ['pages/menu/menu', 'pages/menu-admin/menu-admin', 'pages/menu-dish-editor/menu-dish-editor', 'pages/menu-preview/menu-preview']) {
     assert.ok(manifest.pages.includes(route))
     for (const ext of ['.js', '.json', '.wxml', '.wxss']) assert.ok(fs.existsSync(path.join(root, route + ext)))
     JSON.parse(fs.readFileSync(path.join(root, route + '.json'), 'utf8'))
@@ -28,7 +28,7 @@ test('菜单三页已注册且资源完整，预览引用唯一公开模板和�
 })
 
 test('菜单与管理 WXML 标签平衡，所有事件都存在对应实现', () => {
-  for (const route of ['pages/menu/menu', 'pages/menu-admin/menu-admin']) {
+  for (const route of ['pages/menu/menu', 'pages/menu-admin/menu-admin', 'pages/menu-dish-editor/menu-dish-editor']) {
     const definition = loadDefinition(route)
     const source = fs.readFileSync(path.join(root, route + '.wxml'), 'utf8').replace(/<!--[\s\S]*?-->/g, '')
     const stack = []

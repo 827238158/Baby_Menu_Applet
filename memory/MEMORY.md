@@ -4,7 +4,7 @@
 
 ## 稳定事实
 
-- 技术栈为微信原生小程序 WXML、WXSS、JavaScript、JSON；公开页 pages/menu/menu、管理页 pages/menu-admin/menu-admin、预览页 pages/menu-preview/menu-preview，共用 services/menu-page.js 和公开页 WXML/WXSS。
+- 技术栈为微信原生小程序 WXML、WXSS、JavaScript、JSON；公开页 pages/menu/menu、管理页 pages/menu-admin/menu-admin、独立菜品编辑页 pages/menu-dish-editor/menu-dish-editor、预览页 pages/menu-preview/menu-preview，共用 services/menu-page.js 和公开页 WXML/WXSS。
 - 上云后菜单唯一真源是 COS menu/；日常从管理页维护。旧 Excel 转换和首次迁移工具已淘汰，Excel 与图片只作本机备份且不受 Git 跟踪。
 - 菜单资料云端维护，购物车、数量和合计仍是本地展示状态，无支付或真实订单，price 保持字符串 '0'。预览购物车不写真实缓存。
 - 心愿夹使用独立 SCF + 私有 COS，不使用数据库，仅允许两名 OpenID 白名单用户访问；后端入口为 `serverless/gift-api/index.main_handler`，前端云端配置为 `miniprogram/config/gift-cloud.js`。
